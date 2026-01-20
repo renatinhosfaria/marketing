@@ -89,6 +89,90 @@ class AgentSettings(BaseSettings):
         description="TTL de conversas em dias"
     )
 
+    # Multi-Agent System
+    multi_agent_enabled: bool = Field(
+        default=False,
+        description="Habilitar sistema multi-agente"
+    )
+    orchestrator_timeout: int = Field(
+        default=120,
+        ge=30,
+        le=600,
+        description="Timeout total do orchestrator em segundos"
+    )
+    max_parallel_subagents: int = Field(
+        default=4,
+        ge=1,
+        le=10,
+        description="Máximo de subagentes em paralelo"
+    )
+
+    # Subagent Timeouts
+    timeout_classification: int = Field(
+        default=30,
+        ge=5,
+        le=120,
+        description="Timeout ClassificationAgent em segundos"
+    )
+    timeout_anomaly: int = Field(
+        default=30,
+        ge=5,
+        le=120,
+        description="Timeout AnomalyAgent em segundos"
+    )
+    timeout_forecast: int = Field(
+        default=45,
+        ge=5,
+        le=180,
+        description="Timeout ForecastAgent em segundos"
+    )
+    timeout_recommendation: int = Field(
+        default=30,
+        ge=5,
+        le=120,
+        description="Timeout RecommendationAgent em segundos"
+    )
+    timeout_campaign: int = Field(
+        default=20,
+        ge=5,
+        le=60,
+        description="Timeout CampaignAgent em segundos"
+    )
+    timeout_analysis: int = Field(
+        default=45,
+        ge=5,
+        le=180,
+        description="Timeout AnalysisAgent em segundos"
+    )
+
+    # Synthesis
+    synthesis_max_tokens: int = Field(
+        default=4096,
+        ge=256,
+        le=8192,
+        description="Máximo de tokens para síntese de respostas"
+    )
+    synthesis_temperature: float = Field(
+        default=0.3,
+        ge=0.0,
+        le=1.0,
+        description="Temperature para síntese de respostas"
+    )
+
+    # Subagent Retry
+    subagent_max_retries: int = Field(
+        default=2,
+        ge=0,
+        le=5,
+        description="Máximo de retries por subagente"
+    )
+    subagent_retry_delay: float = Field(
+        default=1.0,
+        ge=0.1,
+        le=10.0,
+        description="Delay entre retries em segundos"
+    )
+
     class Config:
         env_prefix = "AGENT_"
         env_file = ".env"
