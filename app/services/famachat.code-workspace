@@ -1,0 +1,21 @@
+{
+	"folders": [
+		{
+			"path": "../../../famachat"
+		},
+		{
+			"path": "../.."
+		}
+	],
+	"settings": {
+		"chat.agent.enabled": true,
+		"chat.agent.maxRequests": 15,
+		"chat.mcp.discovery.enabled": {
+			"claude-desktop": true,
+			"windsurf": true,
+			"cursor-global": true,
+			"cursor-workspace": true
+		},
+		"github.copilot.chat.agent.autoFix": true
+	}
+}

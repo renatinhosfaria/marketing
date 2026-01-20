@@ -1,0 +1,177 @@
+# FamaChat ML - Docker Compose Otimizado
+# Build unico com reutilizacao de imagem para todos os servicos
+
+services:
+  # ==================== API FastAPI ====================
+  famachat-ml-api:
+    image: famachat-ml:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: famachat-ml-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://famachat-ml-redis:6379/0
+      - ML_API_KEY=${ML_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - AGENT_LLM_PROVIDER=${LLM_PROVIDER:-openai}
+      - AGENT_LLM_MODEL=${OPENAI_MODEL:-gpt-4.1-2025-04-14}
+      - AGENT_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AGENT_OPENAI_API_KEY=${OPENAI_API_KEY}
+      - MODELS_STORAGE_PATH=/app/models_storage
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DEBUG=${DEBUG:-false}
+    volumes:
+      - ./models_storage:/app/models_storage
+      - ./logs:/app/logs
+    depends_on:
+      famachat-ml-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - famachat-ml-network
+
+  # ==================== Celery Worker ====================
+  famachat-ml-worker:
+    image: famachat-ml:latest
+    depends_on:
+      famachat-ml-api:
+        condition: service_healthy
+    container_name: famachat-ml-worker
+    restart: unless-stopped
+    command: >
+      celery -A app.tasks.celery_app worker
+      --loglevel=info
+      --concurrency=2
+      --queues=default,training,ml
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://famachat-ml-redis:6379/0
+      - ML_API_KEY=${ML_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - AGENT_LLM_PROVIDER=${LLM_PROVIDER:-openai}
+      - AGENT_LLM_MODEL=${OPENAI_MODEL:-gpt-4.1-2025-04-14}
+      - AGENT_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AGENT_OPENAI_API_KEY=${OPENAI_API_KEY}
+      - MODELS_STORAGE_PATH=/app/models_storage
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./models_storage:/app/models_storage
+      - ./logs:/app/logs
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 3G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    networks:
+      - famachat-ml-network
+
+  # ==================== Celery Beat (Scheduler) ====================
+  famachat-ml-beat:
+    image: famachat-ml:latest
+    depends_on:
+      famachat-ml-api:
+        condition: service_healthy
+    container_name: famachat-ml-beat
+    restart: unless-stopped
+    command: >
+      celery -A app.tasks.celery_app beat
+      --loglevel=info
+      --scheduler celery.beat:PersistentScheduler
+      --schedule=/app/celerybeat-schedule
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://famachat-ml-redis:6379/0
+      - ML_API_KEY=${ML_API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - celerybeat_schedule:/app
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    networks:
+      - famachat-ml-network
+
+  # ==================== Redis ====================
+  famachat-ml-redis:
+    image: redis:7-alpine
+    container_name: famachat-ml-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_ml_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - famachat-ml-network
+
+  # ==================== Flower (Monitoramento Celery) ====================
+  famachat-ml-flower:
+    image: famachat-ml:latest
+    depends_on:
+      - famachat-ml-redis
+    container_name: famachat-ml-flower
+    restart: unless-stopped
+    command: >
+      celery -A app.tasks.celery_app flower
+      --port=5555
+      --basic_auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD}
+      --url_prefix=flower
+    environment:
+      - REDIS_URL=redis://famachat-ml-redis:6379/0
+      - FLOWER_USER=${FLOWER_USER:-admin}
+      - FLOWER_PASSWORD=${FLOWER_PASSWORD}
+    ports:
+      - "5555:5555"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - famachat-ml-network
+
+# ==================== VOLUMES ====================
+volumes:
+  redis_ml_data:
+    driver: local
+  celerybeat_schedule:
+    driver: local
+
+# ==================== NETWORKS ====================
+networks:
+  famachat-ml-network:
+    driver: bridge

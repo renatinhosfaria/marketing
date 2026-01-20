@@ -1,0 +1,77 @@
+# FamaChat ML - .gitignore
+
+# ==================== Python ====================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ==================== Virtual Environments ====================
+venv/
+ENV/
+env/
+.venv/
+
+# ==================== IDE ====================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ==================== Environment ====================
+.env
+.env.local
+.env.*.local
+
+# ==================== Logs ====================
+logs/
+*.log
+
+# ==================== Models ====================
+models_storage/*.joblib
+models_storage/*.pkl
+models_storage/*.json
+!models_storage/.gitkeep
+
+# ==================== Celery ====================
+celerybeat-schedule
+celerybeat.pid
+
+# ==================== Cache ====================
+.cache/
+.pytest_cache/
+.mypy_cache/
+
+# ==================== Coverage ====================
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# ==================== Docker ====================
+.docker/
+
+# ==================== OS ====================
+.DS_Store
+Thumbs.db
+
+# ==================== Alembic ====================
+alembic/versions/*.pyc
