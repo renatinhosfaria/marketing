@@ -15,6 +15,9 @@ from app.agent.orchestrator.nodes.plan_execution import (
     AGENT_PRIORITIES,
     AGENT_TIMEOUTS,
 )
+from app.agent.orchestrator.nodes.dispatch import (
+    dispatch_agents,
+)
 
 __all__ = [
     # parse_request
@@ -28,4 +31,6 @@ __all__ = [
     "AGENT_TASK_DESCRIPTIONS",
     "AGENT_PRIORITIES",
     "AGENT_TIMEOUTS",
+    # dispatch
+    "dispatch_agents",
 ]
