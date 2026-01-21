@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 import json
+import uuid
 
 from app.api.v1.agent.schemas import (
     ChatRequest,
@@ -31,6 +32,11 @@ from app.api.v1.agent.schemas import (
     MultiAgentStatusResponse,
     AgentInfo,
     ListAgentsResponse,
+    SubagentInfo,
+    SubagentStatusResponse,
+    SubagentsListResponse,
+    AgentResultDetail,
+    ChatDetailedResponse,
 )
 from app.agent import get_agent_service, get_agent_settings
 from app.agent.service import get_multi_agent_service
@@ -771,6 +777,120 @@ async def list_available_agents():
         logger.error(f"Erro ao listar agentes: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+# ==========================================
+# Subagent Endpoints
+# ==========================================
+
+@router.get("/subagents", response_model=SubagentsListResponse)
+async def list_subagents(
+    current_user: dict = Depends(get_current_user)
+):
+    """Lista todos os subagentes disponíveis."""
+    from app.agent.subagents import SUBAGENT_REGISTRY
+    from app.agent.config import get_agent_settings
+
+    settings = get_agent_settings()
+
+    subagents = []
+    for name, cls in SUBAGENT_REGISTRY.items():
+        agent = cls()
+        subagents.append(SubagentInfo(
+            name=name,
+            description=agent.AGENT_DESCRIPTION,
+            tools_count=len(agent.get_tools()),
+            timeout=agent.get_timeout()
+        ))
+
+    return SubagentsListResponse(
+        subagents=subagents,
+        total=len(subagents),
+        multi_agent_enabled=settings.multi_agent_enabled
+    )
+
+
+@router.get("/subagents/{name}/status", response_model=SubagentStatusResponse)
+async def get_subagent_status(
+    name: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Retorna status de um subagente específico."""
+    from app.agent.subagents import SUBAGENT_REGISTRY
+
+    if name not in SUBAGENT_REGISTRY:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Subagente '{name}' não encontrado"
+        )
+
+    return SubagentStatusResponse(
+        name=name,
+        status="ready",
+        last_execution_ms=None,
+        total_executions=0,
+        success_rate=1.0
+    )
+
+
+@router.post("/chat/detailed", response_model=ChatDetailedResponse)
+async def chat_detailed(
+    request: ChatRequest,
+    current_user: dict = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Chat com resposta detalhada incluindo info de subagentes."""
+    from app.agent.service import get_agent_service, should_use_multiagent
+    import time
+
+    if not should_use_multiagent():
+        raise HTTPException(
+            status_code=400,
+            detail="Multi-agent system não está habilitado"
+        )
+
+    start_time = time.time()
+
+    try:
+        service = await get_agent_service()
+        result = await service._chat_multiagent(
+            message=request.message,
+            config_id=request.config_id,
+            user_id=current_user["id"],
+            thread_id=request.thread_id or str(uuid.uuid4()),
+            db=db
+        )
+
+        duration_ms = int((time.time() - start_time) * 1000)
+
+        # Formatar resultados dos agentes
+        agent_details = []
+        for name, res in result.get("agent_results", {}).items():
+            if isinstance(res, dict):
+                agent_details.append(AgentResultDetail(
+                    agent_name=name,
+                    success=res.get("success", False),
+                    duration_ms=res.get("duration_ms", 0),
+                    tool_calls=res.get("tool_calls", []),
+                    error=res.get("error")
+                ))
+
+        return ChatDetailedResponse(
+            success=True,
+            thread_id=result.get("thread_id", ""),
+            response=result.get("response", ""),
+            intent=result.get("intent", "general"),
+            confidence_score=result.get("confidence", 0.0),
+            agent_results=agent_details,
+            total_duration_ms=duration_ms
+        )
+
+    except Exception as e:
+        logger.error(f"Erro no chat detailed: {e}")
+        raise HTTPException(
+            status_code=500,
             detail=str(e)
         )
 

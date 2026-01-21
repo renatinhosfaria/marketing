@@ -287,5 +287,55 @@ class ListAgentsResponse(BaseModel):
                         "timeout": 30
                     }
                 ]
-            }
         }
+        }
+
+
+# ==========================================
+# Multi-Agent Extra Schemas
+# ==========================================
+
+class SubagentInfo(BaseModel):
+    """Informações de um subagente."""
+    name: str
+    description: str
+    tools_count: int
+    timeout: int
+
+
+class SubagentStatusResponse(BaseModel):
+    """Resposta de status de subagente."""
+    name: str
+    status: str  # "ready", "busy", "error"
+    last_execution_ms: Optional[int] = None
+    total_executions: int = 0
+    success_rate: float = 1.0
+
+
+class SubagentsListResponse(BaseModel):
+    """Resposta de listagem de subagentes."""
+    subagents: List[SubagentInfo]
+    total: int
+    multi_agent_enabled: bool
+
+
+class AgentResultDetail(BaseModel):
+    """Detalhe de resultado de um subagente."""
+    agent_name: str
+    success: bool
+    duration_ms: int
+    tool_calls: List[str]
+    data_preview: Optional[str] = None
+    error: Optional[str] = None
+
+
+class ChatDetailedResponse(BaseModel):
+    """Resposta detalhada de chat com info de subagentes."""
+    success: bool
+    thread_id: str
+    response: str
+    intent: str
+    confidence_score: float
+    agent_results: List[AgentResultDetail]
+    total_duration_ms: int
+    error: Optional[str] = None
