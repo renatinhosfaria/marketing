@@ -18,6 +18,11 @@ from app.agent.orchestrator.nodes.collect_results import (
     calculate_confidence_score,
     reduce_agent_results
 )
+from app.agent.orchestrator.nodes.synthesize import (
+    synthesize,
+    format_results_for_synthesis,
+    prioritize_results
+)
 
 __all__ = [
     "parse_request",
@@ -31,4 +36,7 @@ __all__ = [
     "merge_subagent_results",
     "calculate_confidence_score",
     "reduce_agent_results",
+    "synthesize",
+    "format_results_for_synthesis",
+    "prioritize_results",
 ]
