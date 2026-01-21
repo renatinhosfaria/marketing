@@ -2,30 +2,22 @@
 
 Responsavel por criar o plano de execucao baseado na intencao detectada.
 """
-import os
-import sys
-import importlib.util
 from typing import Any
 
-
-# Carregar state.py diretamente para evitar problemas de import circular
-_state_path = os.path.join(
-    os.path.dirname(__file__),
-    '..', 'state.py'
+from app.agent.orchestrator.state import (
+    OrchestratorState,
+    ExecutionPlan,
+    INTENT_TO_AGENTS,
+    get_agents_for_intent
 )
-_state_path = os.path.abspath(_state_path)
+from app.agent.config import get_agent_settings
+from app.core.logging import get_logger
 
-_spec = importlib.util.spec_from_file_location("orchestrator_state", _state_path)
-_state_module = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_state_module)
-
-OrchestratorState = _state_module.OrchestratorState
-ExecutionPlan = _state_module.ExecutionPlan
-get_agents_for_intent = _state_module.get_agents_for_intent
+logger = get_logger("orchestrator.plan_execution")
 
 
 # Descricoes de tarefas por agente
-AGENT_TASK_DESCRIPTIONS: dict[str, str] = {
+AGENT_TASK_DESCRIPTIONS = {
     "classification": "Analisar classificacao de performance das campanhas por tier",
     "anomaly": "Identificar anomalias e problemas nas campanhas",
     "forecast": "Gerar previsoes de CPL e leads para os proximos dias",
@@ -35,7 +27,7 @@ AGENT_TASK_DESCRIPTIONS: dict[str, str] = {
 }
 
 # Prioridades por agente (menor = maior prioridade)
-AGENT_PRIORITIES: dict[str, int] = {
+AGENT_PRIORITIES = {
     "anomaly": 1,
     "classification": 2,
     "recommendation": 3,
@@ -44,15 +36,19 @@ AGENT_PRIORITIES: dict[str, int] = {
     "analysis": 6,
 }
 
-# Timeouts por agente (em segundos)
-AGENT_TIMEOUTS: dict[str, int] = {
-    "classification": 30,
-    "anomaly": 30,
-    "forecast": 45,
-    "recommendation": 30,
-    "campaign": 20,
-    "analysis": 45,
-}
+
+def get_agent_timeout(agent_name: str) -> int:
+    """Retorna timeout para um agente especifico.
+
+    Args:
+        agent_name: Nome do agente
+
+    Returns:
+        Timeout em segundos
+    """
+    settings = get_agent_settings()
+    timeout_attr = f"timeout_{agent_name}"
+    return getattr(settings, timeout_attr, 30)
 
 
 def create_execution_plan(
@@ -63,48 +59,75 @@ def create_execution_plan(
     """Cria plano de execucao para uma intencao.
 
     Args:
-        intent: Intencao detectada do usuario
-        config_id: ID da configuracao Facebook Ads
+        intent: Intencao detectada
+        config_id: ID da configuracao
         context: Contexto adicional (opcional)
 
     Returns:
-        ExecutionPlan com agentes, tasks, parallel e timeout
+        Plano de execucao
     """
+    # Obter agentes necessarios
     agents = get_agents_for_intent(intent)
-    context = context or {}
 
-    tasks: dict[str, dict[str, Any]] = {}
-    for agent in agents:
-        tasks[agent] = {
-            "description": AGENT_TASK_DESCRIPTIONS.get(agent, f"Executar {agent}"),
-            "context": {"config_id": config_id, **context},
-            "priority": AGENT_PRIORITIES.get(agent, 10),
+    # Criar tasks para cada agente
+    tasks = {}
+    max_timeout = 0
+
+    for agent_name in agents:
+        timeout = get_agent_timeout(agent_name)
+        max_timeout = max(max_timeout, timeout)
+
+        tasks[agent_name] = {
+            "description": AGENT_TASK_DESCRIPTIONS.get(
+                agent_name,
+                f"Executar analise de {agent_name}"
+            ),
+            "context": {
+                "config_id": config_id,
+                "intent": intent,
+                **(context or {})
+            },
+            "priority": AGENT_PRIORITIES.get(agent_name, 10),
         }
 
-    # Calcular timeout total (max dos timeouts dos agentes selecionados)
-    timeout = max(AGENT_TIMEOUTS.get(a, 30) for a in agents) if agents else 60
+    # Calcular timeout total (max dos agentes + margem)
+    total_timeout = max_timeout + 30  # 30s de margem para sintese
 
-    return {
-        "agents": agents,
-        "tasks": tasks,
-        "parallel": len(agents) > 1,
-        "timeout": timeout,
-    }
+    return ExecutionPlan(
+        agents=agents,
+        tasks=tasks,
+        parallel=True,  # Sempre paralelo quando possivel
+        timeout=total_timeout
+    )
 
 
 def plan_execution(state: OrchestratorState) -> dict:
     """No que cria o plano de execucao.
 
+    Baseado na intencao detectada, seleciona os subagentes necessarios
+    e cria um plano de execucao.
+
     Args:
         state: Estado atual do orchestrator
 
     Returns:
-        Dict com execution_plan para atualizar o estado
+        Atualizacoes para o estado
     """
-    intent = state.get("intent", "general")
-    config_id = state.get("config_id", 1)
-    context = state.get("context", {})
+    intent = state.get("user_intent", "general")
+    config_id = state.get("config_id", 0)
 
-    plan = create_execution_plan(intent, config_id, context)
+    logger.info(f"Criando plano de execucao para intencao: {intent}")
 
-    return {"execution_plan": plan}
+    # Criar plano
+    plan = create_execution_plan(intent, config_id)
+
+    logger.info(
+        f"Plano criado: {len(plan['agents'])} agentes, "
+        f"parallel={plan['parallel']}, timeout={plan['timeout']}s"
+    )
+    logger.debug(f"Agentes selecionados: {plan['agents']}")
+
+    return {
+        "required_agents": plan["agents"],
+        "execution_plan": plan,
+    }
