@@ -3,16 +3,18 @@
 Responsável por analisar a mensagem do usuário e detectar a intenção.
 """
 import re
-from typing import Optional, TYPE_CHECKING, Any
+from typing import Optional
 
-from langchain_core.messages import HumanMessage, BaseMessage
+from langchain_core.messages import HumanMessage
 
-if TYPE_CHECKING:
-    from app.agent.orchestrator.state import OrchestratorState
+from app.agent.orchestrator.state import OrchestratorState
+from app.core.logging import get_logger
+
+logger = get_logger("orchestrator.parse_request")
 
 
 # Padrões de intenção (regex case-insensitive)
-INTENT_PATTERNS: dict[str, list[str]] = {
+INTENT_PATTERNS = {
     "analyze_performance": [
         r"como\s+est[áa]",
         r"analis[ea]",
@@ -29,6 +31,8 @@ INTENT_PATTERNS: dict[str, list[str]] = {
         r"issue",
         r"alert",
         r"cr[íi]tic",
+        r"troubleshoot",
+        r"diagn[óo]stic",
     ],
     "get_recommendations": [
         r"recomenda",
@@ -45,19 +49,33 @@ INTENT_PATTERNS: dict[str, list[str]] = {
         r"prever",
         r"futuro",
         r"pr[óo]xim[oa]",
+        r"tend[êe]ncia",
         r"vai\s+ser",
+        r"estima",
     ],
     "compare_campaigns": [
         r"compar[ae]",
         r"versus",
         r"\s+vs\s+",
         r"melhor\s+entre",
+        r"diferen[çc]a",
+        r"lado\s+a\s+lado",
     ],
     "full_report": [
         r"relat[óo]rio\s+completo",
         r"resumo\s+geral",
         r"vis[ãa]o\s+geral",
+        r"overview",
         r"tudo\s+sobre",
+        r"an[áa]lise\s+completa",
+    ],
+    "troubleshoot": [
+        r"por\s+que",
+        r"motivo",
+        r"causa",
+        r"investig",
+        r"debug",
+        r"entender",
     ],
 }
 
@@ -100,35 +118,21 @@ def extract_campaign_references(message: str) -> list[str]:
     Returns:
         Lista de nomes de campanhas mencionadas
     """
-    campaigns: list[str] = []
+    campaigns = []
 
-    # Padrão: "campanha 'X'" ou 'campanha "X"' (com aspas)
-    pattern_quoted = r"campanha\s+['\"]([^'\"]+)['\"]"
-    matches_quoted = re.findall(pattern_quoted, message, re.IGNORECASE)
-    campaigns.extend([m.strip() for m in matches_quoted])
+    # Padrão: "campanha X" ou "campanha 'X'"
+    pattern = r"campanha\s+['\"]?([^'\"]+)['\"]?"
+    matches = re.findall(pattern, message, re.IGNORECASE)
+    campaigns.extend(matches)
 
-    # Padrão: "campanha X" sem aspas - captura até pontuação ou final
-    # Captura palavras depois de "campanha " até encontrar ? . , ou fim da string
-    pattern_unquoted = r"campanha\s+([A-Za-zÀ-ÿ0-9][A-Za-zÀ-ÿ0-9\s]+?)(?:[?.,]|$)"
-    matches_unquoted = re.findall(pattern_unquoted, message, re.IGNORECASE)
-    campaigns.extend([m.strip() for m in matches_unquoted])
-
-    # Padrão: texto entre aspas (simples ou duplas) - genérico
+    # Padrão: menção direta com aspas
     quoted = re.findall(r'["\']([^"\']+)["\']', message)
     campaigns.extend(quoted)
 
-    # Remove duplicatas mantendo ordem
-    seen: set[str] = set()
-    unique_campaigns: list[str] = []
-    for c in campaigns:
-        if c not in seen:
-            seen.add(c)
-            unique_campaigns.append(c)
-
-    return unique_campaigns
+    return list(set(campaigns))
 
 
-def parse_request(state: "OrchestratorState") -> dict:
+def parse_request(state: OrchestratorState) -> dict:
     """Nó que analisa a requisição do usuário.
 
     Extrai a intenção e referências a campanhas da última mensagem
@@ -140,8 +144,11 @@ def parse_request(state: "OrchestratorState") -> dict:
     Returns:
         Dicionário com intent, campaign_refs e original_message
     """
+    logger.info("Analisando requisicao do usuario")
+
+    # Obter ultima mensagem do usuario
     messages = state.get("messages", [])
-    user_message: Optional[str] = None
+    user_message = None
 
     # Encontra a última mensagem do usuário (percorre de trás pra frente)
     for msg in reversed(messages):
@@ -153,13 +160,21 @@ def parse_request(state: "OrchestratorState") -> dict:
             break
 
     if not user_message:
-        return {"intent": "general", "campaign_refs": []}
+        logger.warning("Nenhuma mensagem de usuario encontrada")
+        return {
+            "user_intent": "general",
+            "error": "Nenhuma mensagem encontrada"
+        }
 
+    # Detectar intencao
     intent = detect_intent(user_message)
-    campaign_refs = extract_campaign_references(user_message)
+    logger.info(f"Intencao detectada: {intent}")
+
+    # Extrair campanhas mencionadas
+    campaigns = extract_campaign_references(user_message)
+    if campaigns:
+        logger.debug(f"Campanhas mencionadas: {campaigns}")
 
     return {
-        "intent": intent,
-        "campaign_refs": campaign_refs,
-        "original_message": user_message,
+        "user_intent": intent,
     }
