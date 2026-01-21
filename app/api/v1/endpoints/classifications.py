@@ -598,7 +598,7 @@ async def get_classification_summary(
                 confidence_score=c.confidence_score,
                 metrics_snapshot=c.metrics_snapshot,
                 feature_importances=c.feature_importances,
-                model_version=c.model_version,
+                model_version=getattr(c, 'model_version', 'v1.0'),
                 previous_tier=c.previous_tier.value if c.previous_tier else None,
                 tier_change_direction=c.tier_change_direction,
                 classified_at=c.classified_at,
