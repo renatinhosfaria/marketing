@@ -17,10 +17,12 @@ from app.agent.orchestrator.state import (
 )
 from app.agent.orchestrator.graph import (
     build_orchestrator_graph,
-    OrchestratorAgent,
-    should_dispatch,
     get_orchestrator,
-    reset_orchestrator,
+    reset_orchestrator
+)
+from app.agent.orchestrator.prompts import (
+    get_orchestrator_prompt,
+    get_synthesis_prompt
 )
 
 __all__ = [
@@ -36,8 +38,9 @@ __all__ = [
     "get_agents_for_intent",
     # Graph
     "build_orchestrator_graph",
-    "OrchestratorAgent",
-    "should_dispatch",
     "get_orchestrator",
     "reset_orchestrator",
+    # Prompts
+    "get_orchestrator_prompt",
+    "get_synthesis_prompt",
 ]
