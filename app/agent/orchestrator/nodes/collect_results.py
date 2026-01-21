@@ -1,173 +1,125 @@
 """No collect_results do Orchestrator.
 
-Responsavel por coletar resultados dos subagentes apos execucao paralela.
+Responsavel por coletar e agregar resultados dos subagentes.
 """
-import os
-import importlib.util
-from typing import Any, Optional
-from datetime import datetime
+from typing import Any
+
+from app.agent.orchestrator.state import OrchestratorState
+from app.agent.subagents.state import AgentResult
+from app.core.logging import get_logger
+
+logger = get_logger("orchestrator.collect_results")
 
 
-# Carregar state.py diretamente para evitar problemas de import circular
-_state_path = os.path.join(
-    os.path.dirname(__file__),
-    '..', 'state.py'
-)
-_state_path = os.path.abspath(_state_path)
-
-_spec = importlib.util.spec_from_file_location("orchestrator_state", _state_path)
-_state_module = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_state_module)
-
-OrchestratorState = _state_module.OrchestratorState
-AgentResult = _state_module.AgentResult
-
-
-# Carregar subagents/state.py diretamente
-_subagent_state_path = os.path.join(
-    os.path.dirname(__file__),
-    '..', '..', 'subagents', 'state.py'
-)
-_subagent_state_path = os.path.abspath(_subagent_state_path)
-
-_subagent_spec = importlib.util.spec_from_file_location("subagent_state", _subagent_state_path)
-_subagent_module = importlib.util.module_from_spec(_subagent_spec)
-_subagent_spec.loader.exec_module(_subagent_module)
-
-SubagentState = _subagent_module.SubagentState
-
-
-def _calculate_duration_ms(
-    started_at: Optional[datetime],
-    completed_at: Optional[datetime]
-) -> int:
-    """Calcula duracao em milissegundos entre dois timestamps.
+def merge_subagent_results(
+    existing: dict[str, AgentResult],
+    new_results: list[dict]
+) -> dict[str, AgentResult]:
+    """Combina resultados existentes com novos resultados.
 
     Args:
-        started_at: Timestamp de inicio
-        completed_at: Timestamp de conclusao
+        existing: Resultados ja coletados
+        new_results: Novos resultados para adicionar
 
     Returns:
-        Duracao em milissegundos, ou 0 se timestamps invalidos
+        Dicionario combinado de resultados
     """
-    if started_at is None or completed_at is None:
-        return 0
+    merged = dict(existing)
 
-    try:
-        delta = completed_at - started_at
-        # Converter timedelta para milissegundos
-        return int(delta.total_seconds() * 1000)
-    except Exception:
-        return 0
+    for item in new_results:
+        agent_name = item.get("agent_name")
+        result = item.get("result", {})
+
+        if agent_name:
+            merged[agent_name] = result
+
+    return merged
 
 
-def _create_tool_calls_list(tool_calls_count: int) -> list[str]:
-    """Cria lista de tool_calls com base no contador.
+def calculate_confidence_score(results: dict[str, AgentResult]) -> float:
+    """Calcula score de confianca baseado nos resultados.
 
-    Nota: Como nao temos os nomes especificos das tools chamadas,
-    criamos uma lista com placeholders baseados no count.
+    O score e calculado como proporcao de agentes que tiveram sucesso.
 
     Args:
-        tool_calls_count: Numero de chamadas de tools
+        results: Resultados dos subagentes
 
     Returns:
-        Lista de strings representando as tool calls
+        Score de 0.0 a 1.0
     """
-    if tool_calls_count <= 0:
-        return []
-    return [f"tool_call_{i+1}" for i in range(tool_calls_count)]
+    if not results:
+        return 0.0
 
-
-def convert_subagent_to_result(
-    subagent_state: dict[str, Any],
-    agent_name: str
-) -> AgentResult:
-    """Converte SubagentState para formato AgentResult.
-
-    Args:
-        subagent_state: Estado do subagente apos execucao
-        agent_name: Nome do agente (ex: 'classification', 'anomaly')
-
-    Returns:
-        AgentResult formatado para o OrchestratorState
-    """
-    # Extrair campos com valores padrao para campos ausentes
-    result_data = subagent_state.get("result")
-    error = subagent_state.get("error")
-    started_at = subagent_state.get("started_at")
-    completed_at = subagent_state.get("completed_at")
-    tool_calls_count = subagent_state.get("tool_calls_count", 0)
-
-    # Determinar sucesso: tem resultado (mesmo vazio) e nao tem erro
-    success = (result_data is not None) and (error is None)
-
-    # Calcular duracao
-    duration_ms = _calculate_duration_ms(started_at, completed_at)
-
-    # Criar lista de tool_calls
-    tool_calls = _create_tool_calls_list(tool_calls_count)
-
-    return AgentResult(
-        agent_name=agent_name,
-        success=success,
-        data=result_data,
-        error=error,
-        duration_ms=duration_ms,
-        tool_calls=tool_calls
+    successful = sum(
+        1 for r in results.values()
+        if isinstance(r, dict) and r.get("success", False)
     )
 
+    return successful / len(results)
 
-def collect_results(
-    state: OrchestratorState,
-    subagent_states: Optional[list[dict[str, Any]]] = None
-) -> dict[str, Any]:
-    """No que coleta resultados dos subagentes apos execucao paralela.
 
-    Este no e chamado depois que todos os subagentes terminaram sua execucao.
-    Ele consolida os resultados no formato esperado pelo OrchestratorState.
+def collect_results(state: OrchestratorState) -> dict:
+    """No que coleta resultados dos subagentes.
+
+    Agrega todos os resultados retornados pelos subagentes
+    apos execucao paralela.
 
     Args:
         state: Estado atual do orchestrator
-        subagent_states: Lista de estados dos subagentes apos execucao.
-            Cada estado deve conter 'agent_name' para identificacao.
 
     Returns:
-        Dict com 'agent_results' atualizado para merge no estado
+        Atualizacoes para o estado
     """
-    # Obter resultados existentes (preservar)
-    existing_results = dict(state.get("agent_results", {}))
+    logger.info("Coletando resultados dos subagentes")
 
-    # Se nao ha estados de subagentes, retornar estado atual
-    if subagent_states is None or len(subagent_states) == 0:
-        return {"agent_results": existing_results}
+    agent_results = state.get("agent_results", {})
 
-    # Processar cada estado de subagente
-    for subagent_state in subagent_states:
-        try:
-            # Extrair nome do agente
-            agent_name = subagent_state.get("agent_name")
-            if agent_name is None:
-                # Tentar extrair do task se disponivel
-                task = subagent_state.get("task", {})
-                agent_name = task.get("agent_name", "unknown")
+    # Log dos resultados
+    successful = [
+        name for name, r in agent_results.items()
+        if isinstance(r, dict) and r.get("success", False)
+    ]
+    failed = [
+        name for name, r in agent_results.items()
+        if isinstance(r, dict) and not r.get("success", True)
+    ]
 
-            # Converter para AgentResult
-            agent_result = convert_subagent_to_result(subagent_state, agent_name)
+    logger.info(
+        f"Resultados coletados: {len(successful)} sucesso, {len(failed)} falha"
+    )
 
-            # Adicionar/sobrescrever no dicionario de resultados
-            existing_results[agent_name] = agent_result
+    if failed:
+        logger.warning(f"Agentes com falha: {failed}")
 
-        except Exception as e:
-            # Log do erro mas continua processando outros resultados
-            # Em producao, usar logger apropriado
-            agent_name = subagent_state.get("agent_name", "unknown")
-            existing_results[agent_name] = AgentResult(
-                agent_name=agent_name,
-                success=False,
-                data=None,
-                error=f"Error collecting result: {str(e)}",
-                duration_ms=0,
-                tool_calls=[]
-            )
+    # Calcular confidence score
+    confidence = calculate_confidence_score(agent_results)
 
-    return {"agent_results": existing_results}
+    logger.info(f"Confidence score: {confidence:.2f}")
+
+    return {
+        "agent_results": agent_results,
+        "confidence_score": confidence,
+    }
+
+
+def reduce_agent_results(
+    left: dict[str, AgentResult],
+    right: dict[str, AgentResult]
+) -> dict[str, AgentResult]:
+    """Reducer para combinar resultados de multiplos subagentes.
+
+    Usado pelo LangGraph para agregar resultados de nos paralelos.
+
+    Args:
+        left: Resultados anteriores
+        right: Novos resultados
+
+    Returns:
+        Resultados combinados
+    """
+    result = dict(left) if left else {}
+
+    if right:
+        result.update(right)
+
+    return result

@@ -12,6 +12,12 @@ from app.agent.orchestrator.nodes.dispatch import (
     dispatch_agents,
     create_subagent_node
 )
+from app.agent.orchestrator.nodes.collect_results import (
+    collect_results,
+    merge_subagent_results,
+    calculate_confidence_score,
+    reduce_agent_results
+)
 
 __all__ = [
     "parse_request",
@@ -21,4 +27,8 @@ __all__ = [
     "create_execution_plan",
     "dispatch_agents",
     "create_subagent_node",
+    "collect_results",
+    "merge_subagent_results",
+    "calculate_confidence_score",
+    "reduce_agent_results",
 ]
