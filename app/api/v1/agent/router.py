@@ -25,8 +25,16 @@ from app.api.v1.agent.schemas import (
     MessageResponse,
     AgentStatusResponse,
     ErrorResponse,
+    # Multi-Agent schemas
+    MultiAgentChatRequest,
+    MultiAgentChatResponse,
+    MultiAgentStatusResponse,
+    AgentInfo,
+    ListAgentsResponse,
 )
 from app.agent import get_agent_service, get_agent_settings
+from app.agent.service import get_multi_agent_service
+from app.agent.subagents import SUBAGENT_REGISTRY
 from app.db.session import get_db, async_session_maker
 from app.db.models.agent_models import AgentConversation, AgentMessage, AgentFeedback, MessageRole
 from app.core.security import get_current_user
@@ -538,6 +546,232 @@ async def get_agent_status():
             llm_provider="unknown",
             model="unknown",
             version="1.0.0",
+        )
+
+
+# ==========================================
+# Multi-Agent Endpoints
+# ==========================================
+
+@router.post(
+    "/multi-agent/chat",
+    response_model=MultiAgentChatResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+    summary="Chat com sistema multi-agente",
+    description="Envia mensagem usando o sistema multi-agente orquestrado."
+)
+async def chat_multi_agent(
+    request: MultiAgentChatRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Processa mensagem usando múltiplos agentes especializados.
+
+    O sistema multi-agente utiliza um orquestrador que coordena vários
+    subagentes especializados para fornecer respostas mais completas.
+
+    Subagentes disponíveis:
+    - classification: Análise de tiers de performance
+    - anomaly: Detecção de problemas e alertas
+    - forecast: Previsões de CPL/Leads
+    - recommendation: Recomendações de ações
+    - campaign: Dados de campanhas
+    - analysis: Análises avançadas
+    """
+    try:
+        multi_agent_service = await get_multi_agent_service()
+
+        result = await multi_agent_service.chat_multi_agent(
+            message=request.message,
+            config_id=request.config_id,
+            user_id=current_user["id"],
+            thread_id=request.thread_id,
+        )
+
+        # Salvar conversa e mensagens no banco
+        await _save_conversation(
+            db=db,
+            thread_id=result["thread_id"],
+            config_id=request.config_id,
+            user_id=current_user["id"],
+            user_message=request.message,
+            assistant_message=result.get("response", ""),
+        )
+
+        return MultiAgentChatResponse(
+            success=result.get("success", False),
+            thread_id=result.get("thread_id", ""),
+            response=result.get("response", ""),
+            confidence_score=result.get("confidence_score", 0.0),
+            intent=result.get("intent"),
+            agents_used=result.get("agents_used", []),
+            agent_results=result.get("agent_results", {}),
+            error=result.get("error"),
+        )
+
+    except Exception as e:
+        logger.error(f"Erro no chat multi-agente: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.post(
+    "/multi-agent/chat/stream",
+    summary="Chat multi-agente com streaming",
+    description="Envia mensagem e recebe eventos em streaming (SSE) usando sistema multi-agente."
+)
+async def chat_multi_agent_stream(
+    request: MultiAgentChatRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Processa mensagem com streaming usando sistema multi-agente.
+
+    Emite eventos SSE para acompanhamento em tempo real:
+    - orchestrator_start: Início do processamento
+    - intent_detected: Quando a intenção é identificada
+    - plan_created: Quando o plano de execução é criado
+    - agent_start: Quando um subagente começa
+    - agent_end: Quando um subagente termina
+    - synthesis_start: Início da síntese
+    - text: Chunks da resposta sintetizada
+    - done: Finalização com metadados
+    - error: Em caso de erro
+    """
+    async def generate() -> AsyncGenerator[str, None]:
+        try:
+            multi_agent_service = await get_multi_agent_service()
+            full_response = ""
+            final_thread_id = ""
+
+            async for event in multi_agent_service.stream_chat_multi_agent(
+                message=request.message,
+                config_id=request.config_id,
+                user_id=current_user["id"],
+                thread_id=request.thread_id,
+            ):
+                # Acumular resposta para salvar depois
+                if event.get("type") == "text":
+                    full_response += event.get("content", "")
+
+                # Capturar thread_id
+                if event.get("thread_id"):
+                    final_thread_id = event.get("thread_id")
+
+                # Enviar como SSE
+                yield f"data: {json.dumps(event)}\n\n"
+
+            # Salvar conversa após streaming completo usando sessão nova
+            if full_response and final_thread_id:
+                try:
+                    async with async_session_maker() as db:
+                        await _save_conversation(
+                            db=db,
+                            thread_id=final_thread_id,
+                            config_id=request.config_id,
+                            user_id=current_user["id"],
+                            user_message=request.message,
+                            assistant_message=full_response,
+                        )
+                except Exception as save_error:
+                    logger.error(f"Erro ao salvar conversa multi-agente: {save_error}")
+
+        except Exception as e:
+            logger.error(f"Erro no streaming multi-agente: {e}")
+            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
+
+@router.get(
+    "/multi-agent/status",
+    response_model=MultiAgentStatusResponse,
+    summary="Status do sistema multi-agente",
+    description="Retorna status e agentes disponíveis do sistema multi-agente."
+)
+async def get_multi_agent_status():
+    """
+    Retorna informações do sistema multi-agente.
+
+    Inclui:
+    - Status de operação (online/offline/error)
+    - Modo atual (multi)
+    - Lista de subagentes disponíveis
+    - Versão do sistema
+    """
+    try:
+        # Lista de agentes disponíveis do registry
+        available_agents = list(SUBAGENT_REGISTRY.keys())
+
+        return MultiAgentStatusResponse(
+            status="online",
+            mode="multi",
+            available_agents=available_agents,
+            version="1.0.0",
+        )
+
+    except Exception as e:
+        logger.error(f"Erro ao obter status multi-agente: {e}")
+        return MultiAgentStatusResponse(
+            status="error",
+            mode="multi",
+            available_agents=[],
+            version="1.0.0",
+        )
+
+
+@router.get(
+    "/multi-agent/agents",
+    response_model=ListAgentsResponse,
+    summary="Lista de subagentes",
+    description="Retorna lista detalhada de subagentes disponíveis com descrições."
+)
+async def list_available_agents():
+    """
+    Lista todos os subagentes disponíveis com suas descrições.
+
+    Cada subagente tem:
+    - name: Nome identificador único
+    - description: Descrição das capacidades
+    - timeout: Timeout de execução em segundos
+    """
+    try:
+        agents_info = []
+
+        for name, agent_cls in SUBAGENT_REGISTRY.items():
+            # Instanciar para obter descrição e timeout
+            agent_instance = agent_cls()
+
+            agents_info.append(AgentInfo(
+                name=name,
+                description=getattr(agent_instance, "AGENT_DESCRIPTION", "Sem descrição"),
+                timeout=agent_instance.get_timeout(),
+            ))
+
+        return ListAgentsResponse(
+            total=len(agents_info),
+            agents=agents_info,
+        )
+
+    except Exception as e:
+        logger.error(f"Erro ao listar agentes: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
         )
 
 

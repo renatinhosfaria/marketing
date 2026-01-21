@@ -15,6 +15,13 @@ from app.agent.orchestrator.state import (
     create_initial_orchestrator_state,
     get_agents_for_intent
 )
+from app.agent.orchestrator.graph import (
+    build_orchestrator_graph,
+    OrchestratorAgent,
+    should_dispatch,
+    get_orchestrator,
+    reset_orchestrator,
+)
 
 __all__ = [
     # State
@@ -27,4 +34,10 @@ __all__ = [
     # Functions
     "create_initial_orchestrator_state",
     "get_agents_for_intent",
+    # Graph
+    "build_orchestrator_graph",
+    "OrchestratorAgent",
+    "should_dispatch",
+    "get_orchestrator",
+    "reset_orchestrator",
 ]

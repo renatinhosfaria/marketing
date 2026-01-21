@@ -1,5 +1,9 @@
 """
 Serviço principal do agente de tráfego pago.
+
+Suporta dois modos de operação:
+- Single-agent (padrão): Agente monolítico original
+- Multi-agent: Sistema orquestrado com subagentes especializados
 """
 
 import time
@@ -34,22 +38,71 @@ class TrafficAgentService:
     Serviço do agente de tráfego pago.
 
     Gerencia conversas, execução do grafo e persistência de estado.
+
+    Suporta dois modos de operação:
+    - Single-agent (padrão): Usa o grafo monolítico original
+    - Multi-agent: Usa o OrchestratorAgent com subagentes especializados
+
+    Attributes:
+        _agent: Grafo compilado do agente single-agent
+        _checkpointer: Checkpointer para persistência de estado
+        _multi_agent_mode: Se True, usa o sistema multi-agente
+        _orchestrator: Instância do OrchestratorAgent (somente em modo multi-agent)
     """
 
-    def __init__(self):
+    def __init__(self, multi_agent_mode: bool = False):
+        """
+        Inicializa o serviço do agente.
+
+        Args:
+            multi_agent_mode: Se True, usa o sistema multi-agente ao invés do single-agent
+        """
         self._agent = None
         self._checkpointer = None
+        self._multi_agent_mode = multi_agent_mode
+        self._orchestrator = None  # Para modo multi-agente
+
+    @property
+    def multi_agent_mode(self) -> bool:
+        """Retorna se o serviço está em modo multi-agente."""
+        return self._multi_agent_mode
+
+    @property
+    def orchestrator(self):
+        """Retorna o orchestrator (somente em modo multi-agente)."""
+        return self._orchestrator
 
     async def initialize(self):
         """
         Inicializa o agente e checkpointer.
-        """
-        if self._agent is None:
-            graph = build_agent_graph()
-            self._checkpointer = await AgentCheckpointer.get_checkpointer()
-            self._agent = graph.compile(checkpointer=self._checkpointer)
 
-            logger.info("TrafficAgentService inicializado")
+        Em modo single-agent: Compila o grafo monolítico.
+        Em modo multi-agent: Inicializa o OrchestratorAgent.
+        """
+        if self._multi_agent_mode:
+            # Modo multi-agente: inicializar orchestrator
+            if self._orchestrator is None:
+                try:
+                    from app.agent.orchestrator import OrchestratorAgent
+                    self._orchestrator = OrchestratorAgent()
+                    self._orchestrator.build_graph()
+                    logger.info("TrafficAgentService inicializado em modo multi-agente")
+                except ImportError as e:
+                    logger.error(f"Falha ao importar OrchestratorAgent: {e}")
+                    raise RuntimeError(
+                        "Falha ao inicializar modo multi-agente. "
+                        "Verifique se o módulo orchestrator está disponível."
+                    ) from e
+                except Exception as e:
+                    logger.error(f"Erro ao inicializar orchestrator: {e}")
+                    raise
+        else:
+            # Modo single-agent: inicializar grafo tradicional
+            if self._agent is None:
+                graph = build_agent_graph()
+                self._checkpointer = await AgentCheckpointer.get_checkpointer()
+                self._agent = graph.compile(checkpointer=self._checkpointer)
+                logger.info("TrafficAgentService inicializado")
 
     async def chat(
         self,
@@ -60,6 +113,8 @@ class TrafficAgentService:
     ) -> Dict[str, Any]:
         """
         Processa uma mensagem do usuário e retorna a resposta.
+
+        Roteia automaticamente para o modo multi-agente se configurado.
 
         Args:
             message: Mensagem do usuário
@@ -75,6 +130,10 @@ class TrafficAgentService:
         # Gerar thread_id se não fornecido
         if thread_id is None:
             thread_id = str(uuid.uuid4())
+
+        # Rotear para multi-agente se habilitado
+        if self._multi_agent_mode:
+            return await self.chat_multi_agent(message, config_id, user_id, thread_id)
 
         # Criar mensagem do usuário
         user_message = HumanMessage(content=message)
@@ -129,6 +188,390 @@ class TrafficAgentService:
                 "error": str(e),
                 "response": "Desculpe, ocorreu um erro ao processar sua mensagem."
             }
+
+    async def chat_multi_agent(
+        self,
+        message: str,
+        config_id: int,
+        user_id: int,
+        thread_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Processa uma mensagem usando o sistema multi-agente.
+
+        Este método utiliza o OrchestratorAgent para coordenar
+        múltiplos subagentes especializados e sintetizar uma resposta.
+
+        Args:
+            message: Mensagem do usuário
+            config_id: ID da configuração Facebook Ads
+            user_id: ID do usuário autenticado
+            thread_id: ID da conversa (opcional)
+
+        Returns:
+            Dicionário com:
+            - success: bool indicando se a operação foi bem-sucedida
+            - thread_id: str identificador da conversa
+            - response: str resposta sintetizada
+            - confidence_score: float score de confiança (0-1)
+            - intent: str intenção do usuário detectada
+            - agents_used: list[str] lista de subagentes utilizados
+            - agent_results: dict resultados de cada subagente
+            - error: str mensagem de erro (se success=False)
+        """
+        # Garantir inicialização
+        await self.initialize()
+
+        # Verificar se estamos em modo multi-agente
+        if not self._multi_agent_mode or self._orchestrator is None:
+            logger.error("chat_multi_agent chamado sem modo multi-agente habilitado")
+            return {
+                "success": False,
+                "thread_id": thread_id or str(uuid.uuid4()),
+                "error": "Modo multi-agente não está habilitado",
+                "response": "O sistema multi-agente não está configurado.",
+            }
+
+        # Gerar thread_id se não fornecido
+        if thread_id is None:
+            thread_id = str(uuid.uuid4())
+
+        try:
+            # Executar o orchestrator
+            logger.info(f"Processando mensagem multi-agente: thread={thread_id}")
+
+            result = await self._orchestrator.run(
+                message=message,
+                config_id=config_id,
+                user_id=user_id,
+                thread_id=thread_id
+            )
+
+            # Verificar se houve erro no orchestrator
+            if result.get("error"):
+                logger.warning(f"Orchestrator retornou erro: {result.get('error')}")
+                return {
+                    "success": False,
+                    "thread_id": thread_id,
+                    "error": result.get("error"),
+                    "response": "Desculpe, ocorreu um erro ao processar sua mensagem.",
+                    "confidence_score": 0.0,
+                    "intent": result.get("user_intent"),
+                    "agents_used": result.get("required_agents", []),
+                    "agent_results": result.get("agent_results", {}),
+                }
+
+            # Extrair informações do resultado
+            synthesized_response = result.get("synthesized_response", "")
+            confidence_score = result.get("confidence_score", 0.0)
+            user_intent = result.get("user_intent")
+            required_agents = result.get("required_agents", [])
+            agent_results = result.get("agent_results", {})
+
+            # Se não houver resposta sintetizada, gerar uma básica
+            if not synthesized_response:
+                synthesized_response = "Não foi possível gerar uma resposta. Por favor, tente novamente."
+                logger.warning(f"Resposta vazia do orchestrator: thread={thread_id}")
+
+            # Determinar quais agentes realmente executaram com sucesso
+            agents_used = [
+                agent_name
+                for agent_name, agent_result in agent_results.items()
+                if isinstance(agent_result, dict) and agent_result.get("success", False)
+            ]
+
+            return {
+                "success": True,
+                "thread_id": thread_id,
+                "response": synthesized_response,
+                "confidence_score": confidence_score,
+                "intent": user_intent,
+                "agents_used": agents_used,
+                "agent_results": agent_results,
+            }
+
+        except Exception as e:
+            logger.error(f"Erro no chat_multi_agent: {e}", exc_info=True)
+            return {
+                "success": False,
+                "thread_id": thread_id,
+                "error": str(e),
+                "response": "Desculpe, ocorreu um erro ao processar sua mensagem.",
+                "confidence_score": 0.0,
+                "intent": None,
+                "agents_used": [],
+                "agent_results": {},
+            }
+
+    async def stream_chat_multi_agent(
+        self,
+        message: str,
+        config_id: int,
+        user_id: int,
+        thread_id: Optional[str] = None,
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        Processa uma mensagem com streaming usando sistema multi-agente.
+
+        Emite eventos de streaming para acompanhamento em tempo real do
+        processo de orquestração multi-agente.
+
+        Eventos emitidos:
+        - orchestrator_start: Início do processamento
+        - intent_detected: Quando a intenção é identificada
+        - plan_created: Quando o plano de execução é criado
+        - agent_start: Quando um subagente começa
+        - agent_end: Quando um subagente termina
+        - synthesis_start: Início da síntese
+        - text: Chunks da resposta sintetizada
+        - done: Finalização com metadados
+        - error: Em caso de erro
+
+        Args:
+            message: Mensagem do usuário
+            config_id: ID da configuração Facebook Ads
+            user_id: ID do usuário
+            thread_id: ID da conversa (opcional, cria novo se None)
+
+        Yields:
+            Eventos de streaming conforme o processamento avança
+        """
+        # Garantir inicialização
+        await self.initialize()
+
+        # Verificar se estamos em modo multi-agente
+        if not self._multi_agent_mode or self._orchestrator is None:
+            logger.error("stream_chat_multi_agent chamado sem modo multi-agente habilitado")
+            yield {
+                "type": "error",
+                "error": "Modo multi-agente não está habilitado",
+                "thread_id": thread_id or "",
+                "timestamp": time.time() * 1000,
+            }
+            return
+
+        # Gerar thread_id se não fornecido
+        if thread_id is None:
+            thread_id = str(uuid.uuid4())
+
+        # Timestamp de início do processamento
+        start_time = time.time() * 1000
+
+        try:
+            # Evento: orchestrator_start
+            yield {
+                "type": "orchestrator_start",
+                "thread_id": thread_id,
+                "timestamp": start_time,
+            }
+
+            # Importar dependências do orchestrator
+            from langchain_core.messages import HumanMessage
+            from app.agent.orchestrator.state import (
+                create_initial_orchestrator_state,
+                get_agents_for_intent,
+            )
+
+            # Criar estado inicial
+            initial_state = create_initial_orchestrator_state(
+                config_id=config_id,
+                user_id=user_id,
+                thread_id=thread_id,
+                messages=[HumanMessage(content=message)] if message else []
+            )
+
+            # Obter grafo
+            graph = self._orchestrator.build_graph()
+
+            # Rastrear timestamps por agente
+            agent_start_times: Dict[str, float] = {}
+            agents_completed: List[str] = []
+            detected_intent: Optional[str] = None
+            plan_agents: List[str] = []
+            plan_parallel: bool = True
+            confidence_score: float = 0.0
+
+            # Usar astream com stream_mode="updates" para capturar cada nó
+            async for updates in graph.astream(
+                initial_state,
+                stream_mode="updates",
+            ):
+                current_time = time.time() * 1000
+
+                if not isinstance(updates, dict):
+                    continue
+
+                # Processar cada nó que foi atualizado
+                for node_name, node_output in updates.items():
+                    if not isinstance(node_output, dict):
+                        continue
+
+                    # Nó: parse_request - Detecção de intenção
+                    if node_name == "parse_request":
+                        user_intent = node_output.get("user_intent")
+                        if user_intent:
+                            detected_intent = user_intent
+                            yield {
+                                "type": "intent_detected",
+                                "intent": user_intent,
+                                "thread_id": thread_id,
+                                "timestamp": current_time,
+                            }
+
+                    # Nó: plan_execution - Criação do plano
+                    elif node_name == "plan_execution":
+                        required_agents = node_output.get("required_agents", [])
+                        execution_plan = node_output.get("execution_plan")
+
+                        if required_agents:
+                            plan_agents = required_agents
+                            plan_parallel = True
+                            if execution_plan and isinstance(execution_plan, dict):
+                                plan_parallel = execution_plan.get("parallel", True)
+
+                            yield {
+                                "type": "plan_created",
+                                "agents": plan_agents,
+                                "parallel": plan_parallel,
+                                "thread_id": thread_id,
+                                "timestamp": current_time,
+                            }
+
+                            # Emitir agent_start para cada agente planejado
+                            for agent_name in plan_agents:
+                                agent_start_times[agent_name] = current_time
+                                agent_description = self._get_agent_description(agent_name)
+                                yield {
+                                    "type": "agent_start",
+                                    "agent": agent_name,
+                                    "description": agent_description,
+                                    "thread_id": thread_id,
+                                    "timestamp": current_time,
+                                }
+
+                    # Nó: dispatch_agents ou collect_results - Resultados dos subagentes
+                    elif node_name in ("dispatch_agents", "collect_results"):
+                        agent_results = node_output.get("agent_results", {})
+                        for agent_name, agent_result in agent_results.items():
+                            if agent_name not in agents_completed:
+                                agents_completed.append(agent_name)
+
+                                # Calcular duração
+                                start_ts = agent_start_times.get(agent_name, current_time)
+                                duration_ms = current_time - start_ts
+
+                                # Determinar sucesso
+                                success = True
+                                if isinstance(agent_result, dict):
+                                    success = agent_result.get("success", True)
+
+                                yield {
+                                    "type": "agent_end",
+                                    "agent": agent_name,
+                                    "success": success,
+                                    "duration_ms": duration_ms,
+                                    "thread_id": thread_id,
+                                    "timestamp": current_time,
+                                }
+
+                    # Nó: synthesize - Síntese da resposta
+                    elif node_name == "synthesize":
+                        # Emitir synthesis_start
+                        yield {
+                            "type": "synthesis_start",
+                            "agents_completed": len(agents_completed),
+                            "thread_id": thread_id,
+                            "timestamp": current_time,
+                        }
+
+                        # Obter resposta sintetizada
+                        synthesized_response = node_output.get("synthesized_response", "")
+                        confidence_score = node_output.get("confidence_score", 0.0)
+
+                        # Fazer streaming da resposta em chunks para efeito suave
+                        if synthesized_response:
+                            chunks = self._chunk_text(synthesized_response)
+                            for chunk in chunks:
+                                yield {
+                                    "type": "text",
+                                    "content": chunk,
+                                    "thread_id": thread_id,
+                                    "timestamp": time.time() * 1000,
+                                }
+
+            # Calcular duração total
+            end_time = time.time() * 1000
+            total_duration = end_time - start_time
+
+            # Evento: done
+            yield {
+                "type": "done",
+                "thread_id": thread_id,
+                "confidence_score": confidence_score,
+                "total_duration_ms": total_duration,
+                "agents_used": agents_completed,
+                "timestamp": end_time,
+            }
+
+        except Exception as e:
+            logger.error(f"Erro no stream_chat_multi_agent: {e}", exc_info=True)
+            yield {
+                "type": "error",
+                "error": str(e),
+                "thread_id": thread_id,
+                "timestamp": time.time() * 1000,
+            }
+
+    def _get_agent_description(self, agent_name: str) -> str:
+        """Retorna descrição legível para um subagente.
+
+        Args:
+            agent_name: Nome do subagente
+
+        Returns:
+            Descrição do agente
+        """
+        descriptions = {
+            "classification": "Analisando performance de campanhas",
+            "anomaly": "Detectando anomalias e problemas",
+            "forecast": "Gerando previsões de CPL e leads",
+            "recommendation": "Elaborando recomendações de ações",
+            "campaign": "Coletando dados de campanhas",
+            "analysis": "Executando análises avançadas",
+        }
+        return descriptions.get(agent_name, f"Executando {agent_name}")
+
+    def _chunk_text(self, text: str, chunk_size: int = 50) -> List[str]:
+        """Divide texto em chunks para streaming suave.
+
+        Args:
+            text: Texto para dividir
+            chunk_size: Tamanho aproximado de cada chunk em caracteres
+
+        Returns:
+            Lista de chunks de texto
+        """
+        if not text:
+            return []
+
+        chunks = []
+        words = text.split()
+        current_chunk = ""
+
+        for word in words:
+            if len(current_chunk) + len(word) + 1 > chunk_size and current_chunk:
+                chunks.append(current_chunk + " ")
+                current_chunk = word
+            else:
+                if current_chunk:
+                    current_chunk += " " + word
+                else:
+                    current_chunk = word
+
+        if current_chunk:
+            chunks.append(current_chunk)
+
+        return chunks
 
     async def stream_chat(
         self,
@@ -425,21 +868,62 @@ class TrafficAgentService:
             return False
 
 
-# Instância singleton do serviço
+# Instância singleton do serviço (single-agent)
 _agent_service: Optional[TrafficAgentService] = None
+
+# Instância singleton do serviço (multi-agent)
+_multi_agent_service: Optional[TrafficAgentService] = None
 
 
 async def get_agent_service() -> TrafficAgentService:
     """
-    Obtém a instância do serviço do agente.
+    Obtém a instância do serviço do agente (modo single-agent).
+
+    Esta função retorna o serviço no modo single-agent tradicional.
+    Para modo multi-agente, use get_multi_agent_service().
 
     Returns:
-        TrafficAgentService inicializado
+        TrafficAgentService inicializado em modo single-agent
     """
     global _agent_service
 
     if _agent_service is None:
-        _agent_service = TrafficAgentService()
+        _agent_service = TrafficAgentService(multi_agent_mode=False)
         await _agent_service.initialize()
 
     return _agent_service
+
+
+async def get_multi_agent_service() -> TrafficAgentService:
+    """
+    Obtém a instância do serviço do agente em modo multi-agente.
+
+    Esta função retorna o serviço configurado para usar o
+    OrchestratorAgent com subagentes especializados.
+
+    Para modo single-agent tradicional, use get_agent_service().
+
+    Returns:
+        TrafficAgentService inicializado em modo multi-agente
+
+    Raises:
+        RuntimeError: Se o módulo orchestrator não estiver disponível
+    """
+    global _multi_agent_service
+
+    if _multi_agent_service is None:
+        _multi_agent_service = TrafficAgentService(multi_agent_mode=True)
+        await _multi_agent_service.initialize()
+
+    return _multi_agent_service
+
+
+def reset_services() -> None:
+    """
+    Reseta as instâncias singleton dos serviços.
+
+    Útil para testes que precisam reinicializar os serviços.
+    """
+    global _agent_service, _multi_agent_service
+    _agent_service = None
+    _multi_agent_service = None

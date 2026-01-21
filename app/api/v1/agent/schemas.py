@@ -163,3 +163,129 @@ class SuggestionsResponse(BaseModel):
     """Resposta com sugestões proativas."""
     config_id: int
     suggestions: List[SuggestionItem] = Field(default_factory=list)
+
+
+# ==========================================
+# Multi-Agent Schemas
+# ==========================================
+
+class MultiAgentChatRequest(BaseModel):
+    """Request para chat com sistema multi-agente."""
+    message: str = Field(..., min_length=1, max_length=4000, description="Mensagem do usuário")
+    thread_id: Optional[str] = Field(None, description="ID da conversa (opcional para nova)")
+    config_id: int = Field(..., description="ID da configuração Facebook Ads")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "message": "Analise minhas campanhas e sugira otimizações",
+                "config_id": 1
+            }
+        }
+
+
+class AgentResultSchema(BaseModel):
+    """Resultado de um subagente."""
+    agent_name: str = Field(..., description="Nome do subagente")
+    success: bool = Field(..., description="Se a execução foi bem-sucedida")
+    data: Optional[Dict[str, Any]] = Field(None, description="Dados retornados pelo agente")
+    error: Optional[str] = Field(None, description="Mensagem de erro se houver")
+    duration_ms: int = Field(default=0, description="Duração da execução em milissegundos")
+    tool_calls: List[str] = Field(default_factory=list, description="Lista de ferramentas chamadas")
+
+
+class MultiAgentChatResponse(BaseModel):
+    """Response do chat multi-agente."""
+    success: bool = Field(..., description="Se a requisição foi bem-sucedida")
+    thread_id: str = Field(..., description="ID da conversa")
+    response: str = Field(..., description="Resposta sintetizada do orquestrador")
+    confidence_score: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Score de confiança da resposta (0-1)"
+    )
+    intent: Optional[str] = Field(None, description="Intenção do usuário detectada")
+    agents_used: List[str] = Field(
+        default_factory=list,
+        description="Lista de subagentes utilizados"
+    )
+    agent_results: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Resultados de cada subagente"
+    )
+    error: Optional[str] = Field(None, description="Mensagem de erro se houver")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "thread_id": "abc-123-def",
+                "response": "Análise completa das suas campanhas...",
+                "confidence_score": 0.85,
+                "intent": "analyze_campaigns",
+                "agents_used": ["classification", "anomaly", "recommendation"],
+                "agent_results": {
+                    "classification": {"success": True, "data": {}},
+                    "anomaly": {"success": True, "data": {}}
+                }
+            }
+        }
+
+
+class MultiAgentStatusResponse(BaseModel):
+    """Status do sistema multi-agente."""
+    status: str = Field(..., description="Status do sistema (online, offline, error)")
+    mode: str = Field(..., description="Modo de operação (single ou multi)")
+    available_agents: List[str] = Field(
+        default_factory=list,
+        description="Lista de subagentes disponíveis"
+    )
+    version: str = Field(default="1.0.0", description="Versão do sistema")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "status": "online",
+                "mode": "multi",
+                "available_agents": [
+                    "classification",
+                    "anomaly",
+                    "forecast",
+                    "recommendation",
+                    "campaign",
+                    "analysis"
+                ],
+                "version": "1.0.0"
+            }
+        }
+
+
+class AgentInfo(BaseModel):
+    """Informações de um subagente."""
+    name: str = Field(..., description="Nome identificador do subagente")
+    description: str = Field(..., description="Descrição das capacidades do subagente")
+    timeout: int = Field(default=30, description="Timeout em segundos")
+
+
+class ListAgentsResponse(BaseModel):
+    """Resposta com lista de subagentes disponíveis."""
+    total: int = Field(..., description="Total de subagentes")
+    agents: List[AgentInfo] = Field(
+        default_factory=list,
+        description="Lista de informações dos subagentes"
+    )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "total": 6,
+                "agents": [
+                    {
+                        "name": "classification",
+                        "description": "Analisa e classifica performance de campanhas em tiers",
+                        "timeout": 30
+                    }
+                ]
+            }
+        }

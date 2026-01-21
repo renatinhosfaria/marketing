@@ -16,6 +16,33 @@ root_path = os.path.abspath(os.path.join(
 if root_path not in sys.path:
     sys.path.insert(0, root_path)
 
+_MOCKED_MODULE_NAMES = [
+    "app.agent.config",
+    "app.agent.tools.classification_tools",
+    "app.agent.tools.anomaly_tools",
+    "app.agent.tools.forecast_tools",
+    "app.agent.tools.recommendation_tools",
+    "app.agent.tools.campaign_tools",
+    "app.agent.tools.analysis_tools",
+]
+_REAL_MODULES = {name: sys.modules.get(name) for name in _MOCKED_MODULE_NAMES}
+
+
+def _restore_mocked_modules():
+    """Restaura modulos reais apos carregar os agentes."""
+    for name, module in _REAL_MODULES.items():
+        if module is None:
+            sys.modules.pop(name, None)
+        else:
+            sys.modules[name] = module
+
+
+def _cleanup_loaded_subagent_modules():
+    """Remove modulos carregados para evitar cache entre testes."""
+    for name in list(sys.modules.keys()):
+        if name.startswith("app.agent.subagents"):
+            sys.modules.pop(name, None)
+
 
 def _create_mock_config_module():
     """Cria um modulo de configuracao mock."""
@@ -118,13 +145,15 @@ subagent_base = _load_module_directly('app.agent.subagents.base', base_path)
 for agent_name in ['classification', 'anomaly', 'forecast', 'recommendation', 'campaign', 'analysis']:
     prompts_path = os.path.join(root_path, 'app', 'agent', 'subagents', agent_name, 'prompts.py')
     _load_module_directly(f'app.agent.subagents.{agent_name}.prompts', prompts_path)
-
     agent_path = os.path.join(root_path, 'app', 'agent', 'subagents', agent_name, 'agent.py')
     _load_module_directly(f'app.agent.subagents.{agent_name}.agent', agent_path)
+
+_restore_mocked_modules()
 
 # Agora carregamos o __init__ que contém o registry
 init_path = os.path.join(root_path, 'app', 'agent', 'subagents', '__init__.py')
 subagents_module = _load_module_directly('app.agent.subagents', init_path)
+_cleanup_loaded_subagent_modules()
 
 
 class TestSubagentRegistry:
