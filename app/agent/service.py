@@ -9,6 +9,7 @@ Suporta dois modos de operação:
 import time
 import uuid
 from typing import Any, AsyncGenerator, Dict, List, Optional, Set
+import json
 
 from langchain_core.messages import HumanMessage, AIMessage
 
@@ -54,6 +55,23 @@ def get_agent():
         return get_orchestrator()
     # Retorna agente legado existente
     return build_agent_graph()
+
+
+def format_sse_event(event_type: str, data: dict) -> str:
+    """Formata evento SSE.
+
+    Args:
+        event_type: Tipo do evento
+        data: Dados do evento
+
+    Returns:
+        String formatada para SSE
+    """
+    payload = {
+        "type": event_type,
+        **data
+    }
+    return f"data: {json.dumps(payload)}\\n\\n"
 
 
 class TrafficAgentService:

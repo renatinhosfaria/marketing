@@ -3,6 +3,7 @@ Schemas para a API do Agente de Tráfego Pago.
 """
 
 from typing import Any, Dict, List, Optional
+from enum import Enum
 from pydantic import BaseModel, Field
 from datetime import datetime
 
@@ -101,6 +102,14 @@ class StreamChunk(BaseModel):
     tool: Optional[str] = Field(None, description="Nome da ferramenta (para tool_start/tool_end)")
     thread_id: str = Field(..., description="ID da conversa")
     error: Optional[str] = Field(None, description="Mensagem de erro")
+
+
+class StreamChunkType(str, Enum):
+    """Tipos de eventos de streaming."""
+    INTENT_DETECTED = "intent_detected"
+    AGENTS_PLANNED = "agents_planned"
+    SUBAGENT_START = "subagent_start"
+    SUBAGENT_END = "subagent_end"
 
 
 class MessageResponse(BaseModel):
