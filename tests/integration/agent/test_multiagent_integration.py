@@ -1,8 +1,8 @@
-"""Testes de integração para sistema multi-agente.
+"""Testes de integracao para sistema multi-agente.
 
 Estes testes requerem:
 - Banco de dados configurado
-- API keys válidas
+- API keys validas
 - Redis (opcional)
 """
 import pytest
@@ -21,7 +21,7 @@ def mock_llm():
 
 
 class TestMultiAgentIntegration:
-    """Testes de integração do multi-agent."""
+    """Testes de integracao do multi-agent."""
 
     @pytest.mark.asyncio
     async def test_orchestrator_full_flow(self, mock_llm):
@@ -41,7 +41,7 @@ class TestMultiAgentIntegration:
             config_id=1,
             user_id=1,
             thread_id="test-integration",
-            messages=[HumanMessage(content="Como está a performance?")]
+            messages=[HumanMessage(content="Como esta a performance?")]
         )
 
         # Verificar estado inicial
@@ -51,13 +51,13 @@ class TestMultiAgentIntegration:
 
     @pytest.mark.asyncio
     async def test_subagent_standalone_execution(self, mock_llm):
-        """Testa execução standalone de subagente."""
+        """Testa execucao standalone de subagente."""
         from app.agent.subagents import ClassificationAgent
 
         with patch('app.agent.llm.provider.get_llm_with_tools', return_value=mock_llm):
             agent = ClassificationAgent()
 
-            # Verificar configuração básica
+            # Verificar configuracao basica
             assert agent.AGENT_NAME == "classification"
             assert len(agent.get_tools()) == 4
 
@@ -75,16 +75,16 @@ class TestMultiAgentIntegration:
             assert agent.get_system_prompt() is not None
 
     def test_intent_detection_coverage(self):
-        """Detecção de intenção deve cobrir casos principais."""
+        """Deteccao de intencao deve cobrir casos principais."""
         from app.agent.orchestrator.nodes import detect_intent
 
         test_cases = [
-            ("Como está minha performance?", "analyze_performance"),
+            ("Como esta minha performance?", "analyze_performance"),
             ("Tem algum problema nas campanhas?", "find_problems"),
             ("O que devo fazer agora?", "get_recommendations"),
-            ("Qual a previsão para semana?", "predict_future"),
+            ("Qual a previsao para semana?", "predict_future"),
             ("Compare campanha A com B", "compare_campaigns"),
-            ("Olá", "general"),
+            ("Ola", "general"),
         ]
 
         for message, expected_intent in test_cases:
@@ -93,7 +93,7 @@ class TestMultiAgentIntegration:
                 f"Para '{message}': esperado {expected_intent}, obtido {detected}"
 
     def test_execution_plan_creation(self):
-        """Planos de execução devem ser criados corretamente."""
+        """Planos de execucao devem ser criados corretamente."""
         from app.agent.orchestrator.nodes import create_execution_plan
 
         plan = create_execution_plan("full_report", config_id=1)
@@ -111,7 +111,7 @@ class TestMultiAgentIntegration:
     reason="Requer ambiente completo configurado"
 )
 class TestMultiAgentRealExecution:
-    """Testes com execução real (requer infra)."""
+    """Testes com execucao real (requer infra)."""
 
     @pytest.mark.asyncio
     async def test_real_chat_flow(self):
@@ -121,5 +121,5 @@ class TestMultiAgentRealExecution:
         service = TrafficAgentService()
         await service.initialize()
 
-        # Este teste só roda com ambiente completo
+        # Este teste so roda com ambiente completo
         pass
