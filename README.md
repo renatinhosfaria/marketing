@@ -1,6 +1,10 @@
 # FamaChat ML - Microserviço de Machine Learning
 
-Microserviço Python para otimização de campanhas do Facebook Ads usando Machine Learning.
+Microserviço Python para otimização de campanhas do Facebook Ads usando Machine Learning e **Agente IA Multi-Agent**.
+
+> ⚠️ **NOTA IMPORTANTE:** O sistema legado single-agent está DEPRECADO desde 2026-01-21.
+> Use o novo sistema multi-agente habilitado via `AGENT_MULTI_AGENT_ENABLED=true`.
+> Veja [DEPRECATION.md](DEPRECATION.md) para detalhes.
 
 ## 📋 Visão Geral
 
@@ -10,6 +14,63 @@ O **FamaChat ML** é um microserviço independente que complementa o FamaChat pr
 - **Classificação de Campanhas** - Categorização por tiers de performance
 - **Previsões de CPL/Leads** - Forecast usando Prophet time series
 - **Detecção de Anomalias** - Identificação de comportamentos atípicos
+- **🆕 Agente IA Multi-Agent** - Orquestrador com 6 subagentes especializados (2026-01-21)
+
+## 🤖 Sistema Multi-Agente (Novo!)
+
+O FamaChat ML agora possui um **sistema multi-agente hierárquico** que substitui o agente monolítico legado:
+
+### Arquitetura Multi-Agente
+
+```
+                    ┌────────────────────────┐
+                    │   ORCHESTRATOR AGENT   │
+                    │  (Coordenador Central)  │
+                    └───────────┬────────────┘
+                                │
+        ┌───────────┬───────────┼───────────┬───────────┐
+        ▼           ▼           ▼           ▼           ▼
+   ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
+   │Classification│Anomaly││Forecast ││Recommendation│Campaign│
+   │  Agent  │ │  Agent  │ │  Agent  │ │   Agent   │ │ Agent │
+   └─────────┘ └─────────┘ └─────────┘ └───────────┘ └─────────┘
+        │           │           │           │           │
+        └───────────┴───────────┴───────────┴───────────┘
+                                ▼
+                        ┌──────────────┐
+                        │Analysis Agent│
+                        └──────────────┘
+```
+
+### 6 Subagentes Especializados
+
+| Agente | Função | Tools |
+|--------|--------|-------|
+| **ClassificationAgent** | Analisa tiers de performance | 4 |
+| **AnomalyAgent** | Identifica problemas críticos | 3 |
+| **ForecastAgent** | Previsões de CPL/Leads | 3 |
+| **RecommendationAgent** | Ações acionáveis | 3 |
+| **CampaignAgent** | Detalhes de campanhas | 2 |
+| **AnalysisAgent** | Análises avançadas e ROI | 5 |
+
+### Vantagens
+
+✅ **Análises paralelas** - Subagentes executam simultaneamente
+✅ **Melhor performance** - Meta P95 ≤ 6s (vs 8s legado)
+✅ **Síntese inteligente** - Priorização automática de insights
+✅ **Escalável** - Fácil adicionar novos subagentes
+✅ **Streaming SSE** - Eventos de progresso em tempo real
+
+### Configuração
+
+```env
+# Habilitar sistema multi-agente (Staging: true | Prod: false)
+AGENT_MULTI_AGENT_ENABLED=true
+AGENT_ORCHESTRATOR_TIMEOUT=120
+AGENT_MAX_PARALLEL_SUBAGENTS=4
+```
+
+Veja [app/agent/orchestrator/README.md](app/agent/orchestrator/README.md) para documentação completa.
 
 ## 🏗️ Arquitetura
 

@@ -1,8 +1,21 @@
 """
 Definição do estado do agente de tráfego pago.
+
+⚠️ DEPRECATION WARNING:
+Este módulo define o estado do agente monolítico LEGADO e está DEPRECADO desde 2026-01-21.
+Use app/agent/orchestrator/state.py (OrchestratorState) ou app/agent/subagents/state.py (SubagentState).
+
+Para habilitar o novo sistema: AGENT_MULTI_AGENT_ENABLED=true
 """
 
+import warnings
 from typing import TypedDict, Annotated, Sequence, Optional, Any
+
+warnings.warn(
+    "app.agent.graph.state está DEPRECADO. Use app.agent.orchestrator.state ou app.agent.subagents.state",
+    DeprecationWarning,
+    stacklevel=2
+)
 from langgraph.graph.message import add_messages
 
 

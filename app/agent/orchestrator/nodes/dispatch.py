@@ -4,7 +4,7 @@ Responsavel por disparar subagentes em paralelo usando Send().
 """
 from typing import Any
 
-from langgraph.constants import Send
+from langgraph.types import Send
 
 from app.agent.orchestrator.state import OrchestratorState
 from app.core.logging import get_logger

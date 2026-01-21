@@ -1,8 +1,31 @@
 """
 Construção do grafo LangGraph para o agente de tráfego pago.
+
+⚠️ DEPRECATION WARNING:
+Este módulo implementa o agente monolítico legado (single-agent) e está
+DEPRECADO desde 2026-01-21.
+
+Use o novo sistema multi-agente em app/agent/orchestrator/ que oferece:
+- Análises paralelas via orquestrador
+- 6 subagentes especializados
+- Melhor escalabilidade e performance
+
+Este código será removido em versões futuras após validação completa
+do sistema multi-agente em produção.
+
+Para habilitar o novo sistema: AGENT_MULTI_AGENT_ENABLED=true
 """
 
+import warnings
 from langgraph.graph import StateGraph, START, END
+
+# Emitir warning de deprecação
+warnings.warn(
+    "app.agent.graph.builder está DEPRECADO. "
+    "Use o novo sistema multi-agente em app.agent.orchestrator",
+    DeprecationWarning,
+    stacklevel=2
+)
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from app.agent.graph.state import AgentState

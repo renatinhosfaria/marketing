@@ -1,8 +1,21 @@
 """
 Arestas condicionais do grafo LangGraph para o agente de tráfego pago.
+
+⚠️ DEPRECATION WARNING:
+Este módulo faz parte do agente monolítico LEGADO e está DEPRECADO desde 2026-01-21.
+Use o novo sistema multi-agente em app/agent/orchestrator/.
+
+Para habilitar: AGENT_MULTI_AGENT_ENABLED=true
 """
 
+import warnings
 from typing import Literal
+
+warnings.warn(
+    "app.agent.graph.edges está DEPRECADO. Use app.agent.orchestrator",
+    DeprecationWarning,
+    stacklevel=2
+)
 from app.agent.graph.state import AgentState
 from app.agent.config import get_agent_settings
 

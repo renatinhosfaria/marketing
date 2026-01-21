@@ -1,8 +1,22 @@
 """
 Nós do grafo LangGraph para o agente de tráfego pago.
+
+⚠️ DEPRECATION WARNING:
+Este módulo faz parte do agente monolítico LEGADO e está DEPRECADO desde 2026-01-21.
+Use o novo sistema multi-agente em app/agent/orchestrator/ e app/agent/subagents/.
+
+Este código será removido após validação completa do sistema multi-agente.
+Para habilitar: AGENT_MULTI_AGENT_ENABLED=true
 """
 
+import warnings
 from typing import Any, Dict, List
+
+warnings.warn(
+    "app.agent.graph.nodes está DEPRECADO. Use app.agent.orchestrator",
+    DeprecationWarning,
+    stacklevel=2
+)
 import json
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
 
