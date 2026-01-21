@@ -33,6 +33,29 @@ GRAPH_NODE_NAMES: Set[str] = {
 }
 
 
+def should_use_multiagent() -> bool:
+    """Verifica se deve usar sistema multi-agente.
+
+    Returns:
+        True se multi-agent esta habilitado
+    """
+    settings = get_agent_settings()
+    return settings.multi_agent_enabled
+
+
+def get_agent():
+    """Retorna o agente apropriado baseado na configuracao.
+
+    Returns:
+        Orchestrator se multi-agent habilitado, senao agente legado
+    """
+    if should_use_multiagent():
+        from app.agent.orchestrator import get_orchestrator
+        return get_orchestrator()
+    # Retorna agente legado existente
+    return build_agent_graph()
+
+
 class TrafficAgentService:
     """
     Serviço do agente de tráfego pago.
@@ -134,6 +157,14 @@ class TrafficAgentService:
         # Rotear para multi-agente se habilitado
         if self._multi_agent_mode:
             return await self.chat_multi_agent(message, config_id, user_id, thread_id)
+        if should_use_multiagent():
+            return await self._chat_multiagent(
+                message=message,
+                config_id=config_id,
+                user_id=user_id,
+                thread_id=thread_id,
+                db=None
+            )
 
         # Criar mensagem do usuário
         user_message = HumanMessage(content=message)
@@ -188,6 +219,64 @@ class TrafficAgentService:
                 "error": str(e),
                 "response": "Desculpe, ocorreu um erro ao processar sua mensagem."
             }
+
+    async def _chat_multiagent(
+        self,
+        message: str,
+        config_id: int,
+        user_id: int,
+        thread_id: str,
+        db: Any
+    ) -> dict:
+        """Executa chat usando sistema multi-agente.
+
+        Args:
+            message: Mensagem do usuário
+            config_id: ID da configuração
+            user_id: ID do usuário
+            thread_id: ID da thread
+            db: Sessão do banco
+
+        Returns:
+            Dicionário com resposta e metadados
+        """
+        from app.agent.orchestrator import (
+            get_orchestrator,
+            create_initial_orchestrator_state
+        )
+        from langchain_core.messages import HumanMessage
+
+        logger.info(f"Chat multi-agente: thread={thread_id}")
+
+        # Criar estado inicial
+        state = create_initial_orchestrator_state(
+            config_id=config_id,
+            user_id=user_id,
+            thread_id=thread_id,
+            messages=[HumanMessage(content=message)]
+        )
+
+        # Obter orchestrator
+        orchestrator = get_orchestrator()
+
+        # Executar
+        result = await orchestrator.ainvoke(
+            state,
+            config={"configurable": {"thread_id": thread_id}}
+        )
+
+        # Extrair resposta
+        response = result.get("synthesized_response", "")
+        intent = result.get("user_intent", "general")
+        confidence = result.get("confidence_score", 0.0)
+
+        return {
+            "response": response,
+            "intent": intent,
+            "confidence": confidence,
+            "thread_id": thread_id,
+            "agent_results": result.get("agent_results", {})
+        }
 
     async def chat_multi_agent(
         self,
