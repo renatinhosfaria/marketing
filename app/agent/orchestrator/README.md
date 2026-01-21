@@ -1,6 +1,6 @@
 # Orchestrator Agent
 
-O Orchestrator é o componente central do sistema multi-agente do FamaChat ML.
+O Orchestrator e o componente central do sistema multi-agente do FamaChat ML.
 
 ## Arquitetura
 
@@ -21,7 +21,7 @@ O Orchestrator é o componente central do sistema multi-agente do FamaChat ML.
         └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘
 ```
 
-## Fluxo de Execução
+## Fluxo de Execucao
 
 1. **parse_request**: Detecta intenção do usuário
 2. **plan_execution**: Seleciona subagentes necessários
@@ -30,7 +30,7 @@ O Orchestrator é o componente central do sistema multi-agente do FamaChat ML.
 5. **collect_results**: Agrega resultados
 6. **synthesize**: Gera resposta unificada
 
-## Configuração
+## Configuracao
 
 ```env
 AGENT_MULTI_AGENT_ENABLED=true
@@ -49,7 +49,7 @@ state = create_initial_orchestrator_state(
     config_id=1,
     user_id=1,
     thread_id="thread-123",
-    messages=[HumanMessage(content="Como está a performance?")]
+    messages=[HumanMessage(content="Como esta a performance?")]
 )
 
 # Executar
@@ -60,9 +60,9 @@ result = await orchestrator.ainvoke(state)
 print(result["synthesized_response"])
 ```
 
-## Intenções Suportadas
+## Intencoes Suportadas
 
-| Intenção | Subagentes |
+| Intencao | Subagentes |
 |----------|------------|
 | analyze_performance | classification, campaign |
 | find_problems | anomaly, classification |
@@ -77,9 +77,9 @@ print(result["synthesized_response"])
 Para desabilitar o sistema multi-agente:
 
 ```bash
-# Via variável de ambiente
+# Via variavel de ambiente
 AGENT_MULTI_AGENT_ENABLED=false
 
-# Via restart do serviço
+# Via restart do servico
 pm2 restart famachat-ml --env AGENT_MULTI_AGENT_ENABLED=false
 ```
