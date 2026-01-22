@@ -9,6 +9,8 @@ from langchain_core.messages import HumanMessage
 
 from app.agent.orchestrator.state import OrchestratorState
 from app.core.logging import get_logger
+from app.core.tracing.decorators import log_span
+from app.core.tracing.events import log_intent_detected
 
 logger = get_logger("orchestrator.parse_request")
 
@@ -132,6 +134,7 @@ def extract_campaign_references(message: str) -> list[str]:
     return list(set(campaigns))
 
 
+@log_span("intent_detection", log_args=True, log_result=False)
 def parse_request(state: OrchestratorState) -> dict:
     """Nó que analisa a requisição do usuário.
 
@@ -169,6 +172,20 @@ def parse_request(state: OrchestratorState) -> dict:
     # Detectar intencao
     intent = detect_intent(user_message)
     logger.info(f"Intencao detectada: {intent}")
+
+    # Contar quantos patterns fizeram match para logging
+    matched_patterns_count = 0
+    if intent in INTENT_PATTERNS:
+        for pattern in INTENT_PATTERNS[intent]:
+            if re.search(pattern, user_message.lower()):
+                matched_patterns_count += 1
+
+    # Logar intent detectado
+    log_intent_detected(
+        intent=intent,
+        confidence=1.0,  # Regex-based detection has 100% confidence in pattern match
+        reasoning=f"Detected via regex patterns: {matched_patterns_count} patterns matched"
+    )
 
     # Extrair campanhas mencionadas
     campaigns = extract_campaign_references(user_message)
