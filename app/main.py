@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.core.logging import setup_logging
+from app.core.tracing.middleware import TraceMiddleware
 from app.api.v1.router import api_router
 from app.db.session import engine, check_database_connection
 
@@ -69,6 +70,9 @@ app = FastAPI(
     openapi_url="/openapi.json" if settings.debug else None,
     lifespan=lifespan
 )
+
+# Adicionar middleware de tracing (PRIMEIRO para capturar trace_id o mais cedo possível)
+app.add_middleware(TraceMiddleware)
 
 # Configurar CORS
 app.add_middleware(
