@@ -40,6 +40,11 @@ services:
       - AGENT_SYNTHESIS_TEMPERATURE=${AGENT_SYNTHESIS_TEMPERATURE:-0.3}
       - AGENT_SUBAGENT_MAX_RETRIES=${AGENT_SUBAGENT_MAX_RETRIES:-2}
       - AGENT_SUBAGENT_RETRY_DELAY=${AGENT_SUBAGENT_RETRY_DELAY:-1.0}
+      # Logging Detalhado
+      - AGENT_DETAILED_LOGGING=${AGENT_DETAILED_LOGGING:-false}
+      - AGENT_LOG_FULL_PROMPTS=${AGENT_LOG_FULL_PROMPTS:-false}
+      - AGENT_LOG_FULL_RESPONSES=${AGENT_LOG_FULL_RESPONSES:-false}
+      - AGENT_LOG_FULL_TOOL_DATA=${AGENT_LOG_FULL_TOOL_DATA:-false}
     volumes:
       - ./models_storage:/app/models_storage
       - ./logs:/app/logs
@@ -60,6 +65,12 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"      # Máximo por arquivo
+        max-file: "10"        # Mantém 10 arquivos = 1GB total
+        compress: "true"      # Comprime arquivos antigos
     networks:
       - famachat-ml-network
 
