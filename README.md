@@ -72,6 +72,43 @@ AGENT_MAX_PARALLEL_SUBAGENTS=4
 
 Veja [app/agent/orchestrator/README.md](app/agent/orchestrator/README.md) para documentação completa.
 
+## 📊 Sistema de Logging Detalhado
+
+O FamaChat ML possui sistema de logging estruturado com trace context para visibilidade completa do agente de IA.
+
+### Características
+
+- **Trace Context**: Cada requisição tem trace_id único
+- **Span Hierarchy**: Hierarquia de operações (orquestrador → subagentes → tools)
+- **Logs Estruturados**: JSON para parsing e análise
+- **Correlação**: Backend ↔ ML via X-Trace-ID header
+- **Debug Facilitado**: Filtrar por trace_id e ver execução completa
+
+### Configuração
+
+```bash
+# Habilitar logs detalhados em .env
+LOG_LEVEL=DEBUG
+AGENT_DETAILED_LOGGING=true
+AGENT_LOG_FULL_PROMPTS=true
+AGENT_LOG_FULL_RESPONSES=true
+```
+
+### Uso
+
+```bash
+# Ver logs em tempo real
+docker-compose logs -f famachat-ml-api
+
+# Filtrar por trace_id
+docker-compose logs famachat-ml-api | grep "trace_id.*abc-123"
+
+# Análise com jq
+docker-compose logs famachat-ml-api | jq 'select(.event=="intent_detected")'
+```
+
+**Documentação completa**: [docs/LOGGING.md](docs/LOGGING.md)
+
 ## 🏗️ Arquitetura
 
 ```
