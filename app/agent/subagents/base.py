@@ -10,6 +10,9 @@ from typing import Any, Sequence, List, Optional
 from datetime import datetime
 import asyncio
 import json
+import time
+from app.core.tracing.decorators import log_span
+from app.core.tracing.events import log_tool_call, log_tool_call_error
 
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage
 from langchain_core.tools import BaseTool
@@ -106,7 +109,9 @@ class BaseSubagent(ABC):
             return self._compiled_graph
 
         tools = self.get_tools()
-        tool_node = ToolNode(tools) if tools else None
+        # Wrappear tools com logging
+        wrapped_tools = [self._wrap_tool_with_logging(t) for t in tools] if tools else []
+        tool_node = ToolNode(wrapped_tools) if wrapped_tools else None
 
         # Criar grafo de estado
         graph = StateGraph(SubagentState)
@@ -287,6 +292,76 @@ Provide a clear and actionable response."""
 
         return tool_names
 
+    def _wrap_tool_with_logging(self, tool: BaseTool) -> BaseTool:
+        """Wrappeia uma tool para adicionar logging automático.
+
+        Args:
+            tool: Tool original do LangChain
+
+        Returns:
+            Tool com logging wrapper
+        """
+        original_func = tool.func
+
+        # Verificar se é async
+        if asyncio.iscoroutinefunction(original_func):
+            async def logged_tool_async(*args, **kwargs):
+                start = time.time()
+                try:
+                    result = await original_func(*args, **kwargs)
+                    duration = (time.time() - start) * 1000
+
+                    log_tool_call(
+                        tool_name=tool.name,
+                        params=kwargs,
+                        result=result,
+                        duration_ms=duration,
+                        status="success"
+                    )
+                    return result
+                except Exception as e:
+                    duration = (time.time() - start) * 1000
+                    log_tool_call_error(
+                        tool_name=tool.name,
+                        params=kwargs,
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                        duration_ms=duration
+                    )
+                    raise
+
+            tool.func = logged_tool_async
+        else:
+            def logged_tool_sync(*args, **kwargs):
+                start = time.time()
+                try:
+                    result = original_func(*args, **kwargs)
+                    duration = (time.time() - start) * 1000
+
+                    log_tool_call(
+                        tool_name=tool.name,
+                        params=kwargs,
+                        result=result,
+                        duration_ms=duration,
+                        status="success"
+                    )
+                    return result
+                except Exception as e:
+                    duration = (time.time() - start) * 1000
+                    log_tool_call_error(
+                        tool_name=tool.name,
+                        params=kwargs,
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                        duration_ms=duration
+                    )
+                    raise
+
+            tool.func = logged_tool_sync
+
+        return tool
+
+    @log_span("subagent_execution", log_args=True, log_result=True)
     async def run(
         self,
         task: SubagentTask,
