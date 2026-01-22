@@ -12,6 +12,8 @@ from app.agent.orchestrator.state import (
 )
 from app.agent.config import get_agent_settings
 from app.core.logging import get_logger
+from app.core.tracing.decorators import log_span
+from app.core.tracing.events import log_subagents_selected
 
 logger = get_logger("orchestrator.plan_execution")
 
@@ -101,6 +103,7 @@ def create_execution_plan(
     )
 
 
+@log_span("execution_planning", log_args=False, log_result=False)
 def plan_execution(state: OrchestratorState) -> dict:
     """No que cria o plano de execucao.
 
@@ -120,6 +123,13 @@ def plan_execution(state: OrchestratorState) -> dict:
 
     # Criar plano
     plan = create_execution_plan(intent, config_id)
+
+    # Logar seleção de subagentes
+    log_subagents_selected(
+        subagents=plan["agents"],
+        reasoning=f"Intent '{intent}' mapped to {len(plan['agents'])} agents: {', '.join(plan['agents'])}",
+        parallel=plan["parallel"]
+    )
 
     logger.info(
         f"Plano criado: {len(plan['agents'])} agentes, "
