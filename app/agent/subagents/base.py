@@ -295,12 +295,18 @@ Provide a clear and actionable response."""
     def _wrap_tool_with_logging(self, tool: BaseTool) -> BaseTool:
         """Wrappeia uma tool para adicionar logging automático.
 
+        IMPORTANTE: Cria uma CÓPIA da tool original para evitar mutação.
+
         Args:
             tool: Tool original do LangChain
 
         Returns:
-            Tool com logging wrapper
+            Nova instância de tool com logging wrapper (não modifica a original)
         """
+        import copy
+
+        # Criar cópia da tool para não modificar a original
+        wrapped_tool = copy.copy(tool)
         original_func = tool.func
 
         # Verificar se é async
@@ -312,7 +318,7 @@ Provide a clear and actionable response."""
                     duration = (time.time() - start) * 1000
 
                     log_tool_call(
-                        tool_name=tool.name,
+                        tool_name=wrapped_tool.name,
                         params=kwargs,
                         result=result,
                         duration_ms=duration,
@@ -322,7 +328,7 @@ Provide a clear and actionable response."""
                 except Exception as e:
                     duration = (time.time() - start) * 1000
                     log_tool_call_error(
-                        tool_name=tool.name,
+                        tool_name=wrapped_tool.name,
                         params=kwargs,
                         error_type=type(e).__name__,
                         error_message=str(e),
@@ -330,7 +336,7 @@ Provide a clear and actionable response."""
                     )
                     raise
 
-            tool.func = logged_tool_async
+            wrapped_tool.func = logged_tool_async
         else:
             def logged_tool_sync(*args, **kwargs):
                 start = time.time()
@@ -339,7 +345,7 @@ Provide a clear and actionable response."""
                     duration = (time.time() - start) * 1000
 
                     log_tool_call(
-                        tool_name=tool.name,
+                        tool_name=wrapped_tool.name,
                         params=kwargs,
                         result=result,
                         duration_ms=duration,
@@ -349,7 +355,7 @@ Provide a clear and actionable response."""
                 except Exception as e:
                     duration = (time.time() - start) * 1000
                     log_tool_call_error(
-                        tool_name=tool.name,
+                        tool_name=wrapped_tool.name,
                         params=kwargs,
                         error_type=type(e).__name__,
                         error_message=str(e),
@@ -357,9 +363,9 @@ Provide a clear and actionable response."""
                     )
                     raise
 
-            tool.func = logged_tool_sync
+            wrapped_tool.func = logged_tool_sync
 
-        return tool
+        return wrapped_tool
 
     @log_span("subagent_execution", log_args=True, log_result=True)
     async def run(

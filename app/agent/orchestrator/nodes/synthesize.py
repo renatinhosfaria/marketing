@@ -3,6 +3,7 @@
 Responsavel por sintetizar resultados dos subagentes em resposta unificada.
 """
 from typing import Any
+import time
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
@@ -12,6 +13,12 @@ from app.agent.config import get_agent_settings
 from app.agent.llm.provider import get_llm
 from app.agent.subagents.state import AgentResult
 from app.core.logging import get_logger
+from app.core.tracing.decorators import log_span
+from app.core.tracing.events import (
+    log_synthesis_start,
+    log_synthesis_completed,
+    log_llm_call
+)
 
 logger = get_logger("orchestrator.synthesize")
 
@@ -79,6 +86,7 @@ def format_results_for_synthesis(results: dict[str, AgentResult]) -> str:
     return "\n---\n".join(sections)
 
 
+@log_span("synthesis", log_args=False, log_result=False)
 async def synthesize(state: OrchestratorState) -> dict:
     """No que sintetiza resultados em resposta unificada.
 
@@ -103,6 +111,12 @@ async def synthesize(state: OrchestratorState) -> dict:
             "messages": [AIMessage(content="Nao foi possivel obter analises.")]
         }
 
+    # Logar início da síntese
+    log_synthesis_start(
+        subagent_results_count=len(agent_results),
+        strategy="comprehensive"
+    )
+
     # Formatar resultados
     formatted_results = format_results_for_synthesis(agent_results)
 
@@ -118,9 +132,7 @@ async def synthesize(state: OrchestratorState) -> dict:
     # Construir prompt
     synthesis_prompt = get_synthesis_prompt()
 
-    messages = [
-        SystemMessage(content=synthesis_prompt),
-        HumanMessage(content=f"""
+    prompt_content = f"""
 Intencao do usuario: {user_intent}
 
 Resultados dos agentes especialistas:
@@ -128,13 +140,48 @@ Resultados dos agentes especialistas:
 {formatted_results}
 
 Por favor, sintetize esses resultados em uma resposta clara e util.
-""")
+"""
+
+    messages = [
+        SystemMessage(content=synthesis_prompt),
+        HumanMessage(content=prompt_content)
     ]
+
+    start_time = time.time()
 
     try:
         # Chamar LLM
         response = await llm.ainvoke(messages)
         synthesized = response.content
+
+        duration_ms = (time.time() - start_time) * 1000
+
+        # Logar chamada ao LLM
+        prompt_tokens = getattr(response, "response_metadata", {}).get("token_usage", {}).get("prompt_tokens", 0)
+        response_tokens = getattr(response, "response_metadata", {}).get("token_usage", {}).get("completion_tokens", 0)
+        total_tokens = prompt_tokens + response_tokens
+
+        # Construir prompt completo para logging
+        full_prompt = f"{synthesis_prompt}\n\n{prompt_content}"
+
+        log_llm_call(
+            prompt=full_prompt,
+            response=synthesized,
+            prompt_tokens=prompt_tokens,
+            response_tokens=response_tokens,
+            duration_ms=duration_ms,
+            prompt_type="synthesis",
+            model=settings.llm_model
+        )
+
+        # Logar conclusão da síntese
+        log_synthesis_completed(
+            success=True,
+            duration_ms=duration_ms,
+            response_length=len(synthesized),
+            model=settings.llm_model,
+            tokens_used=total_tokens
+        )
 
         logger.info(f"Sintese concluida: {len(synthesized)} caracteres")
 
@@ -144,7 +191,18 @@ Por favor, sintetize esses resultados em uma resposta clara e util.
         }
 
     except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+
         logger.error(f"Erro na sintese: {e}")
+
+        # Logar falha na síntese
+        log_synthesis_completed(
+            success=False,
+            duration_ms=duration_ms,
+            response_length=0,
+            model=settings.llm_model,
+            tokens_used=0
+        )
 
         # Fallback: concatenar resultados
         fallback = _create_fallback_response(agent_results)

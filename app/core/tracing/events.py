@@ -156,6 +156,53 @@ def log_llm_call(
 # Eventos de Subagentes
 # ============================================================================
 
+def log_subagent_started(
+    subagent: str,
+    task_description: str
+):
+    """Loga início da execução de um subagente"""
+    logger.info(
+        "subagent_started",
+        **get_trace_context(),
+        subagent=subagent,
+        task_description=task_description
+    )
+
+
+def log_subagent_completed(
+    subagent: str,
+    success: bool,
+    duration_ms: float,
+    tool_calls: Optional[List[str]] = None
+):
+    """Loga conclusão de um subagente"""
+    logger.info(
+        "subagent_completed",
+        **get_trace_context(),
+        subagent=subagent,
+        success=success,
+        duration_ms=duration_ms,
+        tool_calls=tool_calls or []
+    )
+
+
+def log_subagent_failed(
+    subagent: str,
+    error_type: str,
+    error_message: str,
+    duration_ms: float
+):
+    """Loga falha na execução de um subagente"""
+    logger.error(
+        "subagent_failed",
+        **get_trace_context(),
+        subagent=subagent,
+        error_type=error_type,
+        error_message=error_message,
+        duration_ms=duration_ms
+    )
+
+
 def log_subagent_result_received(
     subagent: str,
     status: str,
@@ -244,4 +291,23 @@ def log_synthesis_start(
         **get_trace_context(),
         subagent_results_count=subagent_results_count,
         synthesis_strategy=strategy
+    )
+
+
+def log_synthesis_completed(
+    success: bool,
+    duration_ms: float,
+    response_length: int,
+    model: Optional[str] = None,
+    tokens_used: Optional[int] = None
+):
+    """Loga conclusão da síntese"""
+    logger.info(
+        "synthesis_completed",
+        **get_trace_context(),
+        success=success,
+        duration_ms=duration_ms,
+        response_length=response_length,
+        model=model,
+        tokens_used=tokens_used
     )

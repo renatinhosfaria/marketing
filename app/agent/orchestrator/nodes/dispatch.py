@@ -3,15 +3,24 @@
 Responsavel por disparar subagentes em paralelo usando Send().
 """
 from typing import Any
+import time
 
 from langgraph.types import Send
 
 from app.agent.orchestrator.state import OrchestratorState
 from app.core.logging import get_logger
+from app.core.tracing.decorators import log_span
+from app.core.tracing.events import (
+    log_subagent_dispatched,
+    log_subagent_started,
+    log_subagent_completed,
+    log_subagent_failed
+)
 
 logger = get_logger("orchestrator.dispatch")
 
 
+@log_span("dispatch_agents", log_args=False, log_result=False)
 def dispatch_agents(state: OrchestratorState) -> list[Send]:
     """No que dispara subagentes em paralelo.
 
@@ -42,12 +51,14 @@ def dispatch_agents(state: OrchestratorState) -> list[Send]:
         task = tasks.get(agent_name, {})
 
         # Criar argumento para o subagente
+        task_dict = {
+            "description": task.get("description", f"Execute {agent_name}"),
+            "context": task.get("context", {}),
+            "priority": task.get("priority", 10),
+        }
+
         arg = {
-            "task": {
-                "description": task.get("description", f"Execute {agent_name}"),
-                "context": task.get("context", {}),
-                "priority": task.get("priority", 10),
-            },
+            "task": task_dict,
             "config_id": state.get("config_id"),
             "user_id": state.get("user_id"),
             "thread_id": state.get("thread_id"),
@@ -60,6 +71,12 @@ def dispatch_agents(state: OrchestratorState) -> list[Send]:
             arg=arg
         )
         sends.append(send)
+
+        # Logar dispatch do subagente
+        log_subagent_dispatched(
+            subagent=agent_name,
+            task=task_dict
+        )
 
         logger.debug(f"Dispatch criado para: {agent_name}")
 
@@ -88,7 +105,18 @@ def create_subagent_node(agent_name: str):
         """
         from app.agent.subagents import get_subagent
 
+        task = state.get("task", {})
+        task_description = task.get("description", f"Execute {agent_name}")
+
+        # Logar início da execução
+        log_subagent_started(
+            subagent=agent_name,
+            task_description=task_description
+        )
+
         logger.info(f"Executando subagente: {agent_name}")
+
+        start_time = time.time()
 
         try:
             # Obter instancia do subagente
@@ -96,11 +124,21 @@ def create_subagent_node(agent_name: str):
 
             # Executar
             result = await agent.run(
-                task=state.get("task", {}),
+                task=task,
                 config_id=state.get("config_id", 0),
                 user_id=state.get("user_id", 0),
                 thread_id=state.get("thread_id", ""),
                 messages=state.get("messages", [])
+            )
+
+            duration_ms = (time.time() - start_time) * 1000
+
+            # Logar conclusão com sucesso
+            log_subagent_completed(
+                subagent=agent_name,
+                success=result.get("success", False),
+                duration_ms=result.get("duration_ms", duration_ms),
+                tool_calls=result.get("tool_calls", [])
             )
 
             logger.info(
@@ -115,7 +153,18 @@ def create_subagent_node(agent_name: str):
             }
 
         except Exception as e:
+            duration_ms = (time.time() - start_time) * 1000
+
+            # Logar falha
+            log_subagent_failed(
+                subagent=agent_name,
+                error_type=type(e).__name__,
+                error_message=str(e),
+                duration_ms=duration_ms
+            )
+
             logger.error(f"Erro no subagente {agent_name}: {e}")
+
             return {
                 "agent_name": agent_name,
                 "result": {
@@ -123,7 +172,7 @@ def create_subagent_node(agent_name: str):
                     "success": False,
                     "data": None,
                     "error": str(e),
-                    "duration_ms": 0,
+                    "duration_ms": duration_ms,
                     "tool_calls": []
                 }
             }
