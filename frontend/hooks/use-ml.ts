@@ -18,6 +18,20 @@ import type {
 
 const ML_API_BASE = '/api/v1';
 
+/** Obtém o user_id do usuário logado a partir do localStorage. */
+function getCurrentUserId(): number {
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
+    if (raw) {
+      const user = JSON.parse(raw);
+      return user.id ?? 0;
+    }
+  } catch {
+    // ignora erros de parse
+  }
+  return 0;
+}
+
 // ==================== HEALTH ====================
 
 export function useMLHealth() {
@@ -82,7 +96,7 @@ export function useCampaignClassification(
     queryKey: ['ml', 'classifications', 'campaign', configId, campaignId],
     queryFn: () =>
       apiFetchJson<CampaignClassification>(
-        `${ML_API_BASE}/classifications/campaign/${campaignId}?config_id=${configId}`,
+        `${ML_API_BASE}/classifications/campaigns/${campaignId}?config_id=${configId}`,
       ),
     enabled: !!configId && !!campaignId,
     staleTime: 60000,
@@ -94,7 +108,7 @@ export function useClassifyCampaigns(configId: number) {
 
   return useMutation({
     mutationFn: (campaignIds?: string[]) =>
-      apiFetchJson(`${ML_API_BASE}/classifications/classify`, {
+      apiFetchJson(`${ML_API_BASE}/classifications/campaigns/classify`, {
         method: 'POST',
         body: JSON.stringify({ config_id: configId, campaign_ids: campaignIds }),
       }),
@@ -167,7 +181,7 @@ export function useApplyRecommendation() {
     mutationFn: ({ id, notes }: { id: number; notes?: string }) =>
       apiFetchJson(`${ML_API_BASE}/recommendations/${id}/apply`, {
         method: 'POST',
-        body: JSON.stringify({ notes }),
+        body: JSON.stringify({ user_id: getCurrentUserId(), notes }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ml', 'recommendations'] });
@@ -182,7 +196,7 @@ export function useDismissRecommendation() {
     mutationFn: ({ id, reason }: { id: number; reason: string }) =>
       apiFetchJson(`${ML_API_BASE}/recommendations/${id}/dismiss`, {
         method: 'POST',
-        body: JSON.stringify({ reason }),
+        body: JSON.stringify({ user_id: getCurrentUserId(), reason }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ml', 'recommendations'] });
@@ -251,7 +265,7 @@ export function useAcknowledgeAnomaly() {
     mutationFn: ({ id, notes }: { id: number; notes?: string }) =>
       apiFetchJson(`${ML_API_BASE}/anomalies/${id}/acknowledge`, {
         method: 'POST',
-        body: JSON.stringify({ notes }),
+        body: JSON.stringify({ user_id: getCurrentUserId(), notes }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ml', 'anomalies'] });
