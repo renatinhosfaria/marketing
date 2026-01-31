@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/hooks/use-auth";
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "FamaChat ML",
@@ -17,6 +18,7 @@ export default function RootLayout({
       <body className="antialiased">
         <AuthProvider>
           {children}
+          <Toaster richColors position="top-right" />
         </AuthProvider>
       </body>
     </html>
