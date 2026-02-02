@@ -14,9 +14,9 @@ from alembic import context
 # Adicionar path do app
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.config import settings
-from app.db.session import Base
-from app.db.models.ml_models import (
+from shared.config import settings
+from shared.db.session import Base
+from projects.ml.db.models import (  # noqa: F401
     MLTrainedModel,
     MLPrediction,
     MLCampaignClassification,
@@ -24,6 +24,12 @@ from app.db.models.ml_models import (
     MLAnomaly,
     MLTrainingJob,
 )
+from projects.facebook_ads.models.sync import SistemaFacebookAdsSyncHistory  # noqa: F401
+from projects.facebook_ads.models.management import (  # noqa: F401
+    MLFacebookAdsManagementLog,
+    MLFacebookAdsRateLimitLog,
+)
+from shared.db.models.famachat_readonly import SistemaFacebookAdsInsightsBreakdowns  # noqa: F401
 
 # this is the Alembic Config object
 config = context.config

@@ -82,6 +82,10 @@ export interface CampaignWithMetrics extends Campaign {
   ctr: number;
   cpc: number;
   cpl: number | null;
+  cpp: number | null;
+  uniqueCtr: number | null;
+  costPerUniqueClick: number | null;
+  purchaseRoas: number | null;
 }
 
 // ==============================
@@ -152,6 +156,11 @@ export interface InsightsSummary {
   avgCtr: number;
   avgCpc: number;
   avgCpl: number;
+  avgCpm: number;
+  totalUniqueClicks: number;
+  avgCpp: number;
+  avgUniqueCtr: number;
+  avgPurchaseRoas: number | null;
   comparison?: {
     spendChange: number;
     impressionsChange: number;
@@ -160,6 +169,7 @@ export interface InsightsSummary {
     ctrChange: number;
     cpcChange: number;
     cplChange: number;
+    cpmChange: number;
   };
 }
 
@@ -172,7 +182,69 @@ export interface TimeSeriesDataPoint {
   ctr: number;
   cpc: number;
   cpl: number | null;
+  uniqueClicks: number;
+  uniqueCtr: number | null;
+  videoPlays: number | null;
+  videoThruplay: number | null;
 }
+
+// ==============================
+// INTERFACES DE MÉTRICAS EXPANDIDAS
+// ==============================
+
+export interface VideoFunnel {
+  videoPlays: number;
+  video15sWatched: number;
+  videoP25Watched: number;
+  videoP50Watched: number;
+  videoP75Watched: number;
+  videoP95Watched: number;
+  video30sWatched: number;
+  videoP100Watched: number;
+  videoThruplay: number;
+  videoAvgTime: number;
+}
+
+export interface QualityDiagnostics {
+  adId: string;
+  adName: string | null;
+  qualityRanking: string | null;
+  engagementRateRanking: string | null;
+  conversionRateRanking: string | null;
+  impressions: number;
+  spend: number;
+}
+
+export type QualityRanking =
+  | "BELOW_AVERAGE_10"
+  | "BELOW_AVERAGE_20"
+  | "BELOW_AVERAGE_35"
+  | "AVERAGE"
+  | "ABOVE_AVERAGE";
+
+export interface BreakdownInsight {
+  breakdownType: string;
+  breakdownValue: string;
+  spend: number;
+  impressions: number;
+  reach: number;
+  clicks: number;
+  leads: number;
+  conversions: number;
+  ctr: number;
+  cpc: number;
+  cpl: number | null;
+}
+
+export type BreakdownType =
+  | "platform_position"
+  | "region"
+  | "impression_device"
+  | "frequency_value"
+  | "hourly"
+  | "age"
+  | "gender"
+  | "country";
 
 // ==============================
 // INTERFACES DE SYNC
@@ -226,7 +298,8 @@ export type DatePreset =
   | "last_30d"
   | "this_month"
   | "last_month"
-  | "this_year";
+  | "this_year"
+  | "last_year";
 
 export type InsightsTableSource = "today" | "history" | "both";
 
