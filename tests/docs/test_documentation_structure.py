@@ -25,3 +25,10 @@ def test_docs_exist_and_have_title():
         assert path.exists(), f"missing {rel}"
         content = path.read_text(encoding="utf-8")
         assert content.strip().startswith("# "), f"missing H1 in {rel}"
+
+
+def test_readme_sections_present():
+    content = Path("docs/README.md").read_text(encoding="utf-8")
+    assert "Comece aqui" in content
+    assert "Mapa dos servicos" in content
+    assert "Documentos" in content
