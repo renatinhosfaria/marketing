@@ -93,3 +93,9 @@ def test_infra_sections_present():
     content = Path("docs/infra-deploy.md").read_text(encoding="utf-8")
     assert "Docker Compose" in content
     assert "Healthchecks" in content
+
+
+def test_configuration_sections_present():
+    content = Path("docs/configuration.md").read_text(encoding="utf-8")
+    assert "Variaveis principais" in content
+    assert "Exemplo de .env" in content
