@@ -111,3 +111,10 @@ def test_runbooks_sections_present():
     content = Path("docs/runbooks.md").read_text(encoding="utf-8")
     assert "Operacao diaria" in content
     assert "Incidentes comuns" in content
+
+
+def test_testing_and_contributing_sections_present():
+    testing = Path("docs/testing.md").read_text(encoding="utf-8")
+    contributing = Path("docs/contributing.md").read_text(encoding="utf-8")
+    assert "Como rodar" in testing
+    assert "Padroes" in contributing
