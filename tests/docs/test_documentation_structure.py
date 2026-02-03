@@ -74,3 +74,10 @@ def test_agent_sections_present():
     assert "Modo de operacao" in content
     assert "Streaming" in content
     assert "Multi-agent" in content
+
+
+def test_facebook_ads_sections_present():
+    content = Path("docs/facebook-ads.md").read_text(encoding="utf-8")
+    assert "OAuth" in content
+    assert "Sync" in content
+    assert "Insights" in content
