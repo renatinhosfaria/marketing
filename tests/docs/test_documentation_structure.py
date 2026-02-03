@@ -46,3 +46,10 @@ def test_architecture_sections_present():
     assert "Componentes" in content
     assert "Fluxo de dados" in content
     assert "Portas" in content
+
+
+def test_backend_sections_present():
+    content = Path("docs/backend.md").read_text(encoding="utf-8")
+    assert "Entrypoints" in content
+    assert "Rotas" in content
+    assert "Celery" in content
