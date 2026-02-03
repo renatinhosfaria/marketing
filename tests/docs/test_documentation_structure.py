@@ -81,3 +81,9 @@ def test_facebook_ads_sections_present():
     assert "OAuth" in content
     assert "Sync" in content
     assert "Insights" in content
+
+
+def test_frontend_sections_present():
+    content = Path("docs/frontend.md").read_text(encoding="utf-8")
+    assert "Scripts" in content
+    assert "Variaveis de ambiente" in content
