@@ -87,3 +87,9 @@ def test_frontend_sections_present():
     content = Path("docs/frontend.md").read_text(encoding="utf-8")
     assert "Scripts" in content
     assert "Variaveis de ambiente" in content
+
+
+def test_infra_sections_present():
+    content = Path("docs/infra-deploy.md").read_text(encoding="utf-8")
+    assert "Docker Compose" in content
+    assert "Healthchecks" in content
