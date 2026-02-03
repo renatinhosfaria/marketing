@@ -67,3 +67,10 @@ def test_ml_sections_present():
     assert "Previsoes" in content
     assert "Classificacoes" in content
     assert "Recomendacoes" in content
+
+
+def test_agent_sections_present():
+    content = Path("docs/agent.md").read_text(encoding="utf-8")
+    assert "Modo de operacao" in content
+    assert "Streaming" in content
+    assert "Multi-agent" in content
