@@ -105,3 +105,9 @@ def test_observability_sections_present():
     content = Path("docs/observability.md").read_text(encoding="utf-8")
     assert "Logs" in content
     assert "Trace" in content
+
+
+def test_runbooks_sections_present():
+    content = Path("docs/runbooks.md").read_text(encoding="utf-8")
+    assert "Operacao diaria" in content
+    assert "Incidentes comuns" in content
