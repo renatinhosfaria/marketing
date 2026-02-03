@@ -60,3 +60,10 @@ def test_apis_sections_present():
     assert "ML" in content
     assert "Agente" in content
     assert "Facebook Ads" in content
+
+
+def test_ml_sections_present():
+    content = Path("docs/ml.md").read_text(encoding="utf-8")
+    assert "Previsoes" in content
+    assert "Classificacoes" in content
+    assert "Recomendacoes" in content
