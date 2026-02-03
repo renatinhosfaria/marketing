@@ -39,3 +39,10 @@ def test_overview_sections_present():
     assert "Objetivo" in content
     assert "Escopo" in content
     assert "Nao objetivos" in content
+
+
+def test_architecture_sections_present():
+    content = Path("docs/architecture.md").read_text(encoding="utf-8")
+    assert "Componentes" in content
+    assert "Fluxo de dados" in content
+    assert "Portas" in content
