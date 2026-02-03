@@ -32,3 +32,10 @@ def test_readme_sections_present():
     assert "Comece aqui" in content
     assert "Mapa dos servicos" in content
     assert "Documentos" in content
+
+
+def test_overview_sections_present():
+    content = Path("docs/overview.md").read_text(encoding="utf-8")
+    assert "Objetivo" in content
+    assert "Escopo" in content
+    assert "Nao objetivos" in content
