@@ -118,3 +118,9 @@ def test_testing_and_contributing_sections_present():
     contributing = Path("docs/contributing.md").read_text(encoding="utf-8")
     assert "Como rodar" in testing
     assert "Padroes" in contributing
+
+
+def test_no_todo_left():
+    for rel in DOCS:
+        content = Path(rel).read_text(encoding="utf-8")
+        assert "TODO" not in content
