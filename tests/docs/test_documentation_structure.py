@@ -99,3 +99,9 @@ def test_configuration_sections_present():
     content = Path("docs/configuration.md").read_text(encoding="utf-8")
     assert "Variaveis principais" in content
     assert "Exemplo de .env" in content
+
+
+def test_observability_sections_present():
+    content = Path("docs/observability.md").read_text(encoding="utf-8")
+    assert "Logs" in content
+    assert "Trace" in content
