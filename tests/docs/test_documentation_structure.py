@@ -53,3 +53,10 @@ def test_backend_sections_present():
     assert "Entrypoints" in content
     assert "Rotas" in content
     assert "Celery" in content
+
+
+def test_apis_sections_present():
+    content = Path("docs/apis.md").read_text(encoding="utf-8")
+    assert "ML" in content
+    assert "Agente" in content
+    assert "Facebook Ads" in content
