@@ -673,21 +673,34 @@ class MLRepository:
         result = await self.session.execute(query)
         return (result.scalar() or 0) > 0
 
-    async def expire_recommendations(self, config_id: int) -> int:
-        """Expira recomendacoes que passaram do prazo."""
+    async def expire_recommendations(
+        self,
+        config_id: int,
+        entity_type: Optional[str] = None
+    ) -> int:
+        """
+        Expira recomendacoes que passaram do prazo.
+
+        Args:
+            config_id: ID da configuração
+            entity_type: Tipo de entidade (campaign, adset, ad). Se None, expira todas.
+        """
         now = datetime.utcnow()
+        conditions = [
+            MLRecommendation.config_id == config_id,
+            MLRecommendation.is_active == True,
+            MLRecommendation.dismissed == False,
+            MLRecommendation.was_applied == False,
+            MLRecommendation.expires_at.is_not(None),
+            MLRecommendation.expires_at <= now,
+        ]
+
+        if entity_type:
+            conditions.append(MLRecommendation.entity_type == entity_type)
+
         result = await self.session.execute(
             update(MLRecommendation)
-            .where(
-                and_(
-                    MLRecommendation.config_id == config_id,
-                    MLRecommendation.is_active == True,
-                    MLRecommendation.dismissed == False,
-                    MLRecommendation.was_applied == False,
-                    MLRecommendation.expires_at.is_not(None),
-                    MLRecommendation.expires_at <= now,
-                )
-            )
+            .where(and_(*conditions))
             .values(is_active=False)
         )
         return int(result.rowcount or 0)

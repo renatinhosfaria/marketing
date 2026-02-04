@@ -136,7 +136,9 @@ async def list_campaign_classifications(
     config_id: Optional[int] = Query(None, description="ID da configuração"),
     ad_account_id: Optional[str] = Query(None, description="Ad account ID"),
     tier: Optional[str] = Query(None, description="Filtrar por tier"),
-    campaign_id: Optional[str] = Query(None, description="Filtrar por campanha"),
+    entity_type: str = Query("campaign", description="Tipo de entidade (campaign, adset, ad)"),
+    entity_id: Optional[str] = Query(None, description="Filtrar por entidade específica"),
+    campaign_id: Optional[str] = Query(None, description="Filtrar por campanha (alias para entity_id)"),
     min_confidence: Optional[float] = Query(None, ge=0, le=1),
     date_from: Optional[datetime] = Query(None),
     date_to: Optional[datetime] = Query(None),
@@ -147,12 +149,25 @@ async def list_campaign_classifications(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Lista classificações de campanhas.
+    Lista classificações de entidades.
 
     - **config_id**: ID da configuração do Facebook Ads
+    - **entity_type**: Tipo de entidade (campaign, adset, ad)
+    - **entity_id**: ID da entidade específica (opcional)
+    - **campaign_id**: Alias para entity_id (retrocompatibilidade)
     - **tier**: Filtrar por tier específico (HIGH_PERFORMER, MODERATE, LOW, UNDERPERFORMER)
     """
     ml_repo = MLRepository(db)
+
+    # Validate entity_type
+    if entity_type not in VALID_ENTITY_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"entity_type inválido: {entity_type}. Opções: {list(VALID_ENTITY_TYPES)}"
+        )
+
+    # Use campaign_id as alias for entity_id (backward compatibility)
+    resolved_entity_id = entity_id or campaign_id
 
     if config_id is None and ad_account_id:
         from projects.ml.db.repositories.insights_repo import InsightsRepository
@@ -190,7 +205,8 @@ async def list_campaign_classifications(
 
     classifications = await ml_repo.get_classifications(
         config_id=config_id,
-        campaign_id=campaign_id,
+        entity_type=entity_type,
+        entity_id=resolved_entity_id,
         tier=tier_filter,
         min_confidence=min_confidence,
         start_date=start_date,
@@ -201,7 +217,8 @@ async def list_campaign_classifications(
 
     total = await ml_repo.count_classifications(
         config_id=config_id,
-        campaign_id=campaign_id,
+        entity_type=entity_type,
+        entity_id=resolved_entity_id,
         tier=tier_filter,
         min_confidence=min_confidence,
         start_date=start_date,
@@ -210,7 +227,8 @@ async def list_campaign_classifications(
 
     by_tier = await ml_repo.get_classification_counts_by_tier(
         config_id=config_id,
-        campaign_id=campaign_id,
+        entity_type=entity_type,
+        entity_id=resolved_entity_id,
         min_confidence=min_confidence,
         start_date=start_date,
         end_date=end_date,
@@ -227,7 +245,10 @@ async def list_campaign_classifications(
         ClassificationResponse(
             id=c.id,
             config_id=c.config_id,
-            campaign_id=c.campaign_id,
+            entity_type=c.entity_type,
+            entity_id=c.entity_id,
+            parent_id=c.parent_id,
+            campaign_id=c.entity_id if c.entity_type == "campaign" else None,
             campaign_name=None,
             tier=c.tier.value,
             classification_label=_label_from_tier(c.tier.value),
@@ -264,7 +285,9 @@ async def list_classifications(
     config_id: Optional[int] = Query(None, description="ID da configuração"),
     ad_account_id: Optional[str] = Query(None, description="Ad account ID"),
     tier: Optional[str] = Query(None, description="Filtrar por tier"),
-    campaign_id: Optional[str] = Query(None, description="Filtrar por campanha"),
+    entity_type: str = Query("campaign", description="Tipo de entidade (campaign, adset, ad)"),
+    entity_id: Optional[str] = Query(None, description="Filtrar por entidade específica"),
+    campaign_id: Optional[str] = Query(None, description="Filtrar por campanha (alias para entity_id)"),
     min_confidence: Optional[float] = Query(None, ge=0, le=1),
     date_from: Optional[datetime] = Query(None),
     date_to: Optional[datetime] = Query(None),
@@ -274,42 +297,15 @@ async def list_classifications(
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
 ):
+    """
+    Lista classificações de entidades (campaign, adset, ad).
+    """
     return await list_campaign_classifications(
         config_id=config_id,
         ad_account_id=ad_account_id,
         tier=tier,
-        campaign_id=campaign_id,
-        min_confidence=min_confidence,
-        date_from=date_from,
-        date_to=date_to,
-        page=page,
-        page_size=page_size,
-        limit=limit,
-        offset=offset,
-        db=db,
-    )
-
-
-@router.get("", response_model=ClassificationListResponse)
-async def list_campaign_classifications_root(
-    config_id: Optional[int] = Query(None, description="ID da configuração"),
-    ad_account_id: Optional[str] = Query(None, description="Ad account ID"),
-    tier: Optional[str] = Query(None, description="Filtrar por tier"),
-    campaign_id: Optional[str] = Query(None, description="Filtrar por campanha"),
-    min_confidence: Optional[float] = Query(None, ge=0, le=1),
-    date_from: Optional[datetime] = Query(None),
-    date_to: Optional[datetime] = Query(None),
-    page: Optional[int] = Query(None, ge=1),
-    page_size: Optional[int] = Query(None, ge=1, le=200),
-    limit: int = Query(50, ge=1, le=200),
-    offset: int = Query(0, ge=0),
-    db: AsyncSession = Depends(get_db),
-):
-    """Alias para listar classificacoes."""
-    return await list_campaign_classifications(
-        config_id=config_id,
-        ad_account_id=ad_account_id,
-        tier=tier,
+        entity_type=entity_type,
+        entity_id=entity_id,
         campaign_id=campaign_id,
         min_confidence=min_confidence,
         date_from=date_from,
@@ -513,12 +509,24 @@ async def train_classifier(
 async def get_classification_summary(
     config_id: Optional[int] = Query(None, description="ID da configuração"),
     ad_account_id: Optional[str] = Query(None, description="Ad account ID"),
+    entity_type: str = Query("campaign", description="Tipo de entidade (campaign, adset, ad)"),
     window_days: int = Query(7, ge=1, le=30),
     date_from: Optional[datetime] = Query(None),
     date_to: Optional[datetime] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
-    """Resumo das classificacoes para o dashboard."""
+    """
+    Resumo das classificacoes para o dashboard.
+
+    - **entity_type**: Tipo de entidade (campaign, adset, ad)
+    """
+    # Validate entity_type
+    if entity_type not in VALID_ENTITY_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"entity_type inválido: {entity_type}. Opções: {list(VALID_ENTITY_TYPES)}"
+        )
+
     if config_id is None and ad_account_id:
         from projects.ml.db.repositories.insights_repo import InsightsRepository
         insights_repo = InsightsRepository(db)
@@ -545,33 +553,39 @@ async def get_classification_summary(
         window_start = now - timedelta(days=window_days)
         window_end = now
 
+    # Use MLClassification with entity_type filter
     subquery = (
         select(
-            MLCampaignClassification.campaign_id,
-            func.max(MLCampaignClassification.classified_at).label("max_classified_at"),
+            MLClassification.entity_id,
+            func.max(MLClassification.classified_at).label("max_classified_at"),
         )
         .where(
             and_(
-                MLCampaignClassification.config_id == config_id,
-                MLCampaignClassification.classified_at >= window_start,
-                MLCampaignClassification.classified_at <= window_end,
+                MLClassification.config_id == config_id,
+                MLClassification.entity_type == entity_type,
+                MLClassification.classified_at >= window_start,
+                MLClassification.classified_at <= window_end,
             )
         )
-        .group_by(MLCampaignClassification.campaign_id)
+        .group_by(MLClassification.entity_id)
         .subquery()
     )
 
     latest_query = (
-        select(MLCampaignClassification)
+        select(MLClassification)
         .join(
             subquery,
             and_(
-                MLCampaignClassification.campaign_id == subquery.c.campaign_id,
-                MLCampaignClassification.classified_at
-                == subquery.c.max_classified_at,
+                MLClassification.entity_id == subquery.c.entity_id,
+                MLClassification.classified_at == subquery.c.max_classified_at,
             ),
         )
-        .where(MLCampaignClassification.config_id == config_id)
+        .where(
+            and_(
+                MLClassification.config_id == config_id,
+                MLClassification.entity_type == entity_type,
+            )
+        )
     )
 
     result = await db.execute(latest_query)
@@ -589,26 +603,30 @@ async def get_classification_summary(
         label = _label_from_tier(item.tier.value)
         by_label[label] = by_label.get(label, 0) + 1
 
-    total_campaigns = len(latest)
+    total_entities = len(latest)
     avg_confidence = (
-        sum(item.confidence_score for item in latest) / total_campaigns
-        if total_campaigns
+        sum(item.confidence_score for item in latest) / total_entities
+        if total_entities
         else 0.0
     )
 
-    changes_query = select(func.count(MLCampaignClassification.id)).where(
+    changes_query = select(func.count(MLClassification.id)).where(
         and_(
-            MLCampaignClassification.config_id == config_id,
-            MLCampaignClassification.classified_at >= window_start,
-            MLCampaignClassification.classified_at <= window_end,
-            MLCampaignClassification.tier_change_direction != "stable",
+            MLClassification.config_id == config_id,
+            MLClassification.entity_type == entity_type,
+            MLClassification.classified_at >= window_start,
+            MLClassification.classified_at <= window_end,
+            MLClassification.tier_change_direction != "stable",
         )
     )
     changes_result = await db.execute(changes_query)
     recent_changes = int(changes_result.scalar() or 0)
 
-    last_query = select(func.max(MLCampaignClassification.classified_at)).where(
-        MLCampaignClassification.config_id == config_id
+    last_query = select(func.max(MLClassification.classified_at)).where(
+        and_(
+            MLClassification.config_id == config_id,
+            MLClassification.entity_type == entity_type,
+        )
     )
     last_result = await db.execute(last_query)
     last_classification_at = last_result.scalar()
@@ -622,8 +640,8 @@ async def get_classification_summary(
         window_days=window_days,
         date_from=window_start,
         date_to=window_end,
-        total_campaigns=total_campaigns,
-        total=total_campaigns,
+        total_campaigns=total_entities,  # Kept for backward compatibility
+        total=total_entities,
         by_tier=by_tier,
         by_label=by_label,
         average_confidence=avg_confidence,
@@ -634,7 +652,10 @@ async def get_classification_summary(
             ClassificationResponse(
                 id=c.id,
                 config_id=c.config_id,
-                campaign_id=c.campaign_id,
+                entity_type=c.entity_type,
+                entity_id=c.entity_id,
+                parent_id=c.parent_id,
+                campaign_id=c.entity_id if c.entity_type == "campaign" else None,
                 campaign_name=None,
                 tier=c.tier.value,
                 classification_label=_label_from_tier(c.tier.value),

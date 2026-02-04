@@ -470,21 +470,44 @@ class ClassificationService:
         return CampaignFeatures(
             campaign_id=features.entity_id,
             config_id=features.config_id,
+            # Metricas basicas (7d)
             spend_7d=features.spend_7d,
             impressions_7d=features.impressions_7d,
             clicks_7d=features.clicks_7d,
             leads_7d=features.leads_7d,
+            # Metricas calculadas
             cpl_7d=features.cpl_7d,
             ctr_7d=features.ctr_7d,
             cpc_7d=features.cpc_7d,
             conversion_rate_7d=features.conversion_rate_7d,
+            # Tendencias
             cpl_trend=features.cpl_trend,
             leads_trend=features.leads_trend,
             spend_trend=features.spend_trend,
             ctr_trend=features.ctr_trend,
+            # Metricas de periodo mais longo
+            cpl_14d=features.cpl_14d,
+            leads_14d=features.leads_14d,
+            cpl_30d=features.cpl_30d,
+            leads_30d=features.leads_30d,
+            avg_daily_spend_30d=features.avg_daily_spend_30d,
+            # Volatilidade
             cpl_std_7d=features.cpl_std_7d,
-            days_with_leads_7d=features.days_with_leads_7d,
+            leads_std_7d=features.leads_std_7d,
+            # Sazonalidade
+            best_day_of_week=features.best_day_of_week,
+            worst_day_of_week=features.worst_day_of_week,
+            # Frequencia e alcance
             frequency_7d=features.frequency_7d,
+            reach_7d=features.reach_7d,
+            # Consistencia
+            days_with_leads_7d=features.days_with_leads_7d,
+            days_active=features.days_active,
+            # Status
+            is_active=features.is_active,
+            has_budget=features.has_budget,
+            # Timestamp
+            computed_at=features.computed_at or datetime.utcnow(),
         )
 
 

@@ -46,7 +46,8 @@ async def _run_compute_features_for_config(config_id: int, window_days: int = 30
             processed += 1
             exists = await ml_repo.feature_exists(
                 config_id=config_id,
-                campaign_id=campaign.campaign_id,
+                entity_id=campaign.campaign_id,
+                entity_type="campaign",
                 window_days=window_days,
                 feature_date=feature_date,
             )
@@ -62,7 +63,8 @@ async def _run_compute_features_for_config(config_id: int, window_days: int = 30
             if features is None:
                 await ml_repo.create_feature(
                     config_id=config_id,
-                    campaign_id=campaign.campaign_id,
+                    entity_id=campaign.campaign_id,
+                    entity_type="campaign",
                     window_days=window_days,
                     feature_date=feature_date,
                     features=None,
@@ -72,7 +74,8 @@ async def _run_compute_features_for_config(config_id: int, window_days: int = 30
             else:
                 await ml_repo.create_feature(
                     config_id=config_id,
-                    campaign_id=campaign.campaign_id,
+                    entity_id=campaign.campaign_id,
+                    entity_type="campaign",
                     window_days=window_days,
                     feature_date=feature_date,
                     features=_serialize_features(features),
@@ -386,7 +389,7 @@ async def _run_anomaly_detection_for_config(config_id: int, session_maker=None) 
         )
         return {
             "anomalies_detected": result.anomalies_detected,
-            "campaigns_analyzed": result.campaigns_analyzed,
+            "entities_analyzed": result.entities_analyzed,
         }
 
 
