@@ -29,6 +29,9 @@ logger = get_logger(__name__)
 # Confidence penalty for transfer learning predictions (15% reduction)
 CONFIDENCE_PENALTY = 0.85
 
+# Minimum number of campaigns required to train global model
+MIN_TRAINING_SAMPLES = 10
+
 
 @dataclass
 class TransferClassificationResult:
@@ -94,7 +97,7 @@ class LevelTransferLearning:
         # Fetch all campaign features
         features_list = await data_service.get_all_campaign_features(config_id)
 
-        if not features_list or len(features_list) < 4:
+        if not features_list or len(features_list) < MIN_TRAINING_SAMPLES:
             logger.warning(
                 "Insufficient data for global model training",
                 config_id=config_id,

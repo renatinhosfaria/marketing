@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
-import numpy as np
 import pandas as pd
 
 from projects.ml.algorithms.models.timeseries.forecaster import (

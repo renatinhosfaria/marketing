@@ -29,10 +29,19 @@ except ImportError:
 
 @dataclass
 class TuningResult:
-    """Result of hyperparameter tuning."""
+    """Result of hyperparameter tuning.
+
+    Attributes:
+        best_params: Best hyperparameters found
+        cv_metrics: Cross-validation metrics for each parameter combination
+        mean_mape: Mean Absolute Percentage Error (0-100 scale, e.g., 5.0 means 5%)
+        mean_rmse: Root Mean Squared Error (same units as the target metric)
+        training_samples: Number of data points used for tuning
+        tuned_at: Timestamp when tuning was completed
+    """
     best_params: dict
     cv_metrics: list[dict]
-    mean_mape: float
+    mean_mape: float  # Percentage scale: 0-100 (e.g., 5.0 = 5%)
     mean_rmse: float
     training_samples: int
     tuned_at: datetime
@@ -181,7 +190,10 @@ class ProphetTuner:
         Evaluate a parameter combination using cross-validation.
 
         Returns:
-            Tuple of (mape, rmse, mae)
+            Tuple of (mape, rmse, mae) where:
+            - mape: Mean Absolute Percentage Error on 0-100 scale (e.g., 5.0 = 5%)
+            - rmse: Root Mean Squared Error (same units as target)
+            - mae: Mean Absolute Error (same units as target)
         """
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")

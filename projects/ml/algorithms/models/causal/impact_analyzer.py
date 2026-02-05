@@ -170,22 +170,32 @@ class ImpactAnalyzer:
         else:
             pct_change = float('inf') if after_mean > 0 else 0
 
-        # T-test
+        # T-test with NaN handling
         t_stat, p_value = stats.ttest_ind(before, after)
+
+        # Handle NaN p-value (occurs with constant arrays)
+        if np.isnan(p_value):
+            p_value = 1.0  # No significant difference if t-test fails
+
         confidence = round(1 - p_value, 3)
         is_significant = p_value < self.significance_threshold
 
-        # Cohen's d effect size
-        pooled_std = np.sqrt(
-            ((len(before) - 1) * before.std() ** 2 +
-             (len(after) - 1) * after.std() ** 2) /
-            (len(before) + len(after) - 2)
-        )
-
-        if pooled_std > 0:
-            cohens_d = (after_mean - before_mean) / pooled_std
+        # Cohen's d effect size with division by zero protection
+        denominator = len(before) + len(after) - 2
+        if denominator <= 0:
+            # Edge case: not enough degrees of freedom
+            cohens_d = 0.0
         else:
-            cohens_d = 0
+            pooled_std = np.sqrt(
+                ((len(before) - 1) * before.std() ** 2 +
+                 (len(after) - 1) * after.std() ** 2) /
+                denominator
+            )
+
+            if pooled_std > 0:
+                cohens_d = (after_mean - before_mean) / pooled_std
+            else:
+                cohens_d = 0.0
 
         return {
             'pct_change': round(pct_change, 2),

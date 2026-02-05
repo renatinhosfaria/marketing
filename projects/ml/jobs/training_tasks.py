@@ -146,7 +146,6 @@ def train_campaign_classifier(config_id: int, entity_type: str = "campaign"):
         Dict with status, model_id, and training metrics
     """
     import asyncio
-    from shared.db.session import create_isolated_async_session_maker
 
     logger.info(
         "Starting classifier training",
@@ -443,41 +442,59 @@ async def _train_isolation_forest_for_entity(
                 "reason": "save_failed",
             }
 
-        # Persist model metadata to database
-        model_record = await ml_repo.create_model(
-            name=f"isolation_forest_{entity_type}_{entity_id}",
-            model_type=ModelType.ANOMALY_DETECTOR,
-            version="1.0.0",
-            config_id=config_id,
-            model_path=str(model_path),
-            parameters={
-                'contamination': settings.isolation_forest_contamination,
-                'n_estimators': 100,
-                'entity_type': entity_type,
-                'entity_id': entity_id,
-            },
-            feature_columns=detector.isolation_forest_features,
-        )
+        # Persist model metadata to database with proper error handling
+        try:
+            model_record = await ml_repo.create_model(
+                name=f"isolation_forest_{entity_type}_{entity_id}",
+                model_type=ModelType.ANOMALY_DETECTOR,
+                version="1.0.0",
+                config_id=config_id,
+                model_path=str(model_path),
+                parameters={
+                    'contamination': settings.isolation_forest_contamination,
+                    'n_estimators': 100,
+                    'entity_type': entity_type,
+                    'entity_id': entity_id,
+                },
+                feature_columns=detector.isolation_forest_features,
+            )
 
-        # Update status to READY with training metrics
-        await ml_repo.update_model_status(
-            model_record.id,
-            ModelStatus.READY,
-            training_metrics={
-                'samples': len(df),
-                'features_used': detector.isolation_forest_features,
-                'contamination': settings.isolation_forest_contamination,
-            },
-        )
+            # Update status to READY with training metrics
+            await ml_repo.update_model_status(
+                model_record.id,
+                ModelStatus.READY,
+                training_metrics={
+                    'samples': len(df),
+                    'features_used': detector.isolation_forest_features,
+                    'contamination': settings.isolation_forest_contamination,
+                },
+            )
 
-        await session.commit()
+            await session.commit()
 
-        return {
-            "status": "success",
-            "model_id": model_record.id,
-            "samples": len(df),
-            "features": detector.isolation_forest_features,
-        }
+            return {
+                "status": "success",
+                "model_id": model_record.id,
+                "samples": len(df),
+                "features": detector.isolation_forest_features,
+            }
+        except Exception as db_error:
+            await session.rollback()
+            logger.error(
+                "Failed to persist model to database",
+                config_id=config_id,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                error=str(db_error),
+            )
+            # Model is saved to filesystem but not in DB
+            return {
+                "status": "partial_success",
+                "reason": "db_persist_failed",
+                "model_path": str(model_path),
+                "samples": len(df),
+                "error": str(db_error),
+            }
 
 
 async def _train_isolation_forest_for_config(config_id: int, session_maker) -> dict:
