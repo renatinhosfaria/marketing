@@ -131,12 +131,102 @@ def train_leads_forecaster(config_id: int):
 @celery_app.task(
     name="projects.ml.jobs.training_tasks.train_campaign_classifier",
     max_retries=2,
+    soft_time_limit=900,   # 15 minutes
+    time_limit=1200,       # 20 minutes
 )
-def train_campaign_classifier(config_id: int):
-    """Treina classificador de campanhas XGBoost/LightGBM."""
-    logger.info("Iniciando treinamento classifier", config_id=config_id)
-    # TODO: Implementar na Fase 4
-    return {"status": "not_implemented", "config_id": config_id}
+def train_campaign_classifier(config_id: int, entity_type: str = "campaign"):
+    """
+    Train XGBoost classifier for entity classification.
+
+    Args:
+        config_id: Facebook Ads config ID
+        entity_type: 'campaign', 'adset', or 'ad'
+
+    Returns:
+        Dict with status, model_id, and training metrics
+    """
+    import asyncio
+    from shared.db.session import create_isolated_async_session_maker
+
+    logger.info(
+        "Starting classifier training",
+        config_id=config_id,
+        entity_type=entity_type
+    )
+
+    isolated_engine, isolated_session_maker = create_isolated_async_session_maker()
+
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(
+                _train_classifier_for_config(config_id, entity_type, isolated_session_maker)
+            )
+            loop.run_until_complete(isolated_engine.dispose())
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
+
+        if result.get("status") == "insufficient_data":
+            logger.warning(
+                "Insufficient data for training",
+                config_id=config_id,
+                samples=result.get("samples_available", 0),
+            )
+            return result
+
+        logger.info(
+            "Classifier training completed",
+            config_id=config_id,
+            model_id=result.get("model_id"),
+            accuracy=result.get("metrics", {}).get("accuracy"),
+        )
+
+        return {
+            "status": "success",
+            **result,
+        }
+
+    except Exception as e:
+        logger.error(
+            "Classifier training failed",
+            config_id=config_id,
+            error=str(e)
+        )
+        raise
+
+
+async def _train_classifier_for_config(
+    config_id: int,
+    entity_type: str,
+    session_maker,
+) -> dict:
+    """
+    Train classifier for a specific config.
+
+    Returns:
+        Dict with model_id, samples_used, metrics
+    """
+    from projects.ml.services.classification_service import ClassificationService
+
+    async with session_maker() as session:
+        service = ClassificationService(session)
+
+        result = await service.train_classifier(
+            config_id=config_id,
+            min_samples=30,
+            prefer_real_feedback=True,
+        )
+
+        if result is None:
+            return {
+                "status": "insufficient_data",
+                "samples_available": 0,
+                "samples_required": 30,
+            }
+
+        return result
 
 
 @celery_app.task(
