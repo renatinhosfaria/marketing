@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Union
-import os
 
 import joblib
 
@@ -150,7 +149,7 @@ class LevelTransferLearning:
 
         # Save model to disk
         model_dir = Path(settings.models_storage_path) / "transfer"
-        os.makedirs(model_dir, exist_ok=True)
+        model_dir.mkdir(parents=True, exist_ok=True)
 
         model_path = model_dir / f"global_{config_id}.joblib"
 
@@ -260,6 +259,11 @@ class LevelTransferLearning:
                     (result.confidence_score - penalized_confidence) /
                     max(len(result.probabilities) - 1, 1)
                 )
+
+        # Normalize probabilities to ensure they sum to 1.0
+        total = sum(penalized_probabilities.values())
+        if total > 0:
+            penalized_probabilities = {k: v / total for k, v in penalized_probabilities.items()}
 
         return TransferClassificationResult(
             entity_id=entity_id,

@@ -152,7 +152,7 @@ class TestLevelTransferLearning:
 
         config_id = 1
 
-        with patch("os.makedirs"):
+        with patch("pathlib.Path.mkdir"):
             with patch("joblib.dump"):
                 result = await transfer.train_global_model(
                     config_id=config_id,
@@ -161,8 +161,8 @@ class TestLevelTransferLearning:
                 )
 
         # Verify result
-        assert result is not None
-        assert "accuracy" in result or "metrics" in result or result.get("success", True)
+        assert result["success"] is True
+        assert "accuracy" in result.get("metrics", {}) or "samples" in result
 
         # Verify data service was called
         mock_data_service.get_all_campaign_features.assert_called_once_with(config_id)
@@ -298,7 +298,7 @@ class TestLevelTransferLearning:
 
         assert instance1 is not instance2
 
-    def test_classify_without_trained_model_raises(self, sample_entity_features):
+    def test_classify_without_trained_model_uses_fallback(self, sample_entity_features):
         """Should handle classification without trained model gracefully."""
         from projects.ml.algorithms.models.transfer.level_transfer import (
             LevelTransferLearning,
