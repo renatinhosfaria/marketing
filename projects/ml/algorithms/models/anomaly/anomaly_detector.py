@@ -764,6 +764,7 @@ def get_anomaly_detector(
     z_threshold: Optional[float] = None,
     iqr_multiplier: Optional[float] = None,
     min_history_days: Optional[int] = None,
+    use_isolation_forest: Optional[bool] = None,
 ) -> AnomalyDetector:
     """
     Factory function to create AnomalyDetector instances.
@@ -773,6 +774,7 @@ def get_anomaly_detector(
         z_threshold: Custom Z-score threshold (defaults to settings)
         iqr_multiplier: Custom IQR multiplier (defaults to settings)
         min_history_days: Custom minimum history days (defaults to settings)
+        use_isolation_forest: Enable Isolation Forest (defaults to settings)
 
     Returns:
         New AnomalyDetector instance
@@ -781,6 +783,7 @@ def get_anomaly_detector(
         z_threshold=z_threshold,
         iqr_multiplier=iqr_multiplier,
         min_history_days=min_history_days,
+        use_isolation_forest=use_isolation_forest,
     )
 
 
