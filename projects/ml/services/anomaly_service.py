@@ -14,7 +14,7 @@ from projects.ml.db.models import AnomalySeverity
 from projects.ml.db.repositories.ml_repo import MLRepository
 from projects.ml.db.repositories.insights_repo import InsightsRepository
 from projects.ml.algorithms.models.anomaly.anomaly_detector import (
-    anomaly_detector,
+    get_anomaly_detector,
     DetectedAnomaly,
     SeverityLevel,
 )
@@ -150,10 +150,12 @@ class AnomalyService:
                 entities_analyzed += 1
 
                 # Detectar anomalias
-                anomalies = anomaly_detector.detect_anomalies(
+                detector = get_anomaly_detector()
+                anomalies = detector.detect_anomalies(
                     df=df,
                     entity_type=entity_type,
                     entity_id=entity_id,
+                    config_id=config_id,
                 )
 
                 # Salvar anomalias no banco
