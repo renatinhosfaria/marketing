@@ -34,7 +34,7 @@ celery_app.conf.update(
     enable_utc=True,
 
     # Concorrência e recursos
-    worker_concurrency=2,
+    worker_concurrency=settings.celery_worker_concurrency,
     worker_prefetch_multiplier=1,
     worker_max_tasks_per_child=100,
 
@@ -46,6 +46,13 @@ celery_app.conf.update(
     task_acks_late=True,
     task_reject_on_worker_lost=True,
     broker_connection_retry_on_startup=True,
+
+    # Auto-retry configuration for failed tasks
+    task_autoretry_for=(Exception,),
+    task_retry_backoff=True,
+    task_retry_backoff_max=600,  # Max 10 minutes between retries
+    task_retry_jitter=True,
+    task_max_retries=3,
 
     # Rate limiting
     task_default_rate_limit="10/m",
@@ -86,6 +93,13 @@ celery_app.conf.update(
             "task": "projects.ml.jobs.scheduled_tasks.hourly_anomaly_detection",
             "schedule": crontab(minute=30),
             "options": {"queue": "ml"},
+        },
+
+        # Treinar Isolation Forest diariamente às 04:00
+        "daily-anomaly-detector-training": {
+            "task": "projects.ml.jobs.training_tasks.train_anomaly_detectors_all",
+            "schedule": crontab(hour=4, minute=0),
+            "options": {"queue": "training"},
         },
 
         # ==================== ADSET LEVEL ====================
