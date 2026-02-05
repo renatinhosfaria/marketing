@@ -747,3 +747,129 @@ def tune_prophet_all(metric: str = 'cpl'):
         return {"status": "dispatched", "configs_count": len(configs), "tasks": results}
     finally:
         session.close()
+
+
+@celery_app.task(
+    name="projects.ml.jobs.training_tasks.calibrate_ensemble_all",
+    max_retries=1,
+    soft_time_limit=600,
+    time_limit=900,
+)
+def calibrate_ensemble_all():
+    """Calibrate ensemble forecaster weights for all active configs."""
+    from sqlalchemy.orm import sessionmaker
+    from shared.db.models.famachat_readonly import SistemaFacebookAdsConfig
+
+    logger.info("Starting ensemble calibration for all configs")
+
+    Session = sessionmaker(bind=sync_engine)
+    session = Session()
+
+    try:
+        configs = session.query(SistemaFacebookAdsConfig).filter(
+            SistemaFacebookAdsConfig.is_active == True
+        ).all()
+
+        results = []
+        for config in configs:
+            logger.info(
+                "Ensemble calibration queued for config",
+                config_id=config.id,
+                name=config.name,
+            )
+            results.append({"config_id": config.id, "status": "queued"})
+
+        return {
+            "status": "success",
+            "configs_count": len(configs),
+            "results": results,
+        }
+    finally:
+        session.close()
+
+
+@celery_app.task(
+    name="projects.ml.jobs.training_tasks.train_global_transfer_all",
+    max_retries=1,
+    soft_time_limit=1800,
+    time_limit=2400,
+)
+def train_global_transfer_all():
+    """Train global transfer models for all active configs."""
+    import asyncio
+    from shared.db.session import create_isolated_async_session_maker
+    from projects.ml.algorithms.models.transfer.level_transfer import get_level_transfer
+    from projects.ml.services.data_service import DataService
+    from projects.ml.db.repositories.ml_repo import MLRepository
+    from sqlalchemy.orm import sessionmaker
+    from shared.db.models.famachat_readonly import SistemaFacebookAdsConfig
+
+    logger.info("Starting global transfer training for all configs")
+
+    # Get active configs
+    Session = sessionmaker(bind=sync_engine)
+    sync_session = Session()
+
+    try:
+        configs = sync_session.query(SistemaFacebookAdsConfig).filter(
+            SistemaFacebookAdsConfig.is_active == True
+        ).all()
+        config_ids = [c.id for c in configs]
+    finally:
+        sync_session.close()
+
+    # Train for each config
+    isolated_engine, isolated_session_maker = create_isolated_async_session_maker()
+
+    results = []
+
+    async def train_config(config_id: int):
+        async with isolated_session_maker() as session:
+            data_service = DataService(session)
+            ml_repo = MLRepository(session)
+
+            transfer = get_level_transfer()
+            try:
+                result = await transfer.train_global_model(
+                    config_id=config_id,
+                    data_service=data_service,
+                    ml_repo=ml_repo,
+                )
+                return {"config_id": config_id, "status": "success", **result}
+            except Exception as e:
+                logger.warning(
+                    "Transfer training failed for config",
+                    config_id=config_id,
+                    error=str(e),
+                )
+                return {"config_id": config_id, "status": "failed", "error": str(e)}
+
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            for config_id in config_ids:
+                result = loop.run_until_complete(train_config(config_id))
+                results.append(result)
+            loop.run_until_complete(isolated_engine.dispose())
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
+
+        success_count = sum(1 for r in results if r["status"] == "success")
+
+        logger.info(
+            "Global transfer training completed",
+            total=len(results),
+            success=success_count,
+        )
+
+        return {
+            "status": "completed",
+            "configs_count": len(results),
+            "success_count": success_count,
+            "results": results,
+        }
+    except Exception as e:
+        logger.error("Global transfer training failed", error=str(e))
+        raise

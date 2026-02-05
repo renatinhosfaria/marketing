@@ -125,6 +125,20 @@ celery_app.conf.update(
             "options": {"queue": "training"},
         },
 
+        # Calibrate ensemble forecaster weights daily at 05:30
+        "daily-ensemble-calibration": {
+            "task": "projects.ml.jobs.training_tasks.calibrate_ensemble_all",
+            "schedule": crontab(hour=5, minute=30),
+            "options": {"queue": "training"},
+        },
+
+        # Train global transfer model weekly on Monday 03:00
+        "weekly-transfer-learning": {
+            "task": "projects.ml.jobs.training_tasks.train_global_transfer_all",
+            "schedule": crontab(day_of_week=1, hour=3, minute=0),
+            "options": {"queue": "training"},
+        },
+
         # ==================== ADSET LEVEL ====================
         # Classificar adsets diariamente às 06:30
         "daily-adset-classification": {
