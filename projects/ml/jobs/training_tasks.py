@@ -9,7 +9,7 @@ from celery import shared_task
 from sqlalchemy.orm import Session
 
 from app.celery import celery_app
-from shared.db.session import sync_engine
+from shared.db.session import sync_engine, create_isolated_async_session_maker
 from projects.ml.db.models import ModelType, ModelStatus, JobStatus
 from shared.core.logging import get_logger
 
@@ -514,3 +514,196 @@ async def _train_isolation_forest_for_config(config_id: int, session_maker) -> d
 
     results["training_duration_seconds"] = training_duration
     return results
+
+
+@celery_app.task(
+    name="projects.ml.jobs.training_tasks.tune_prophet_for_config",
+    max_retries=2,
+    soft_time_limit=3600,  # 1 hour
+    time_limit=4200,       # 1.2 hours
+)
+def tune_prophet_for_config(config_id: int, metric: str = 'cpl'):
+    """
+    Tune Prophet hyperparameters for entities in a config.
+
+    Args:
+        config_id: Facebook Ads config ID
+        metric: Metric to tune ('cpl', 'leads', 'spend')
+
+    Returns:
+        Dict with tuning results
+    """
+    import asyncio
+
+    logger.info(
+        "Starting Prophet tuning",
+        config_id=config_id,
+        metric=metric,
+    )
+
+    isolated_engine, isolated_session_maker = create_isolated_async_session_maker()
+
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(
+                _tune_prophet_for_config(config_id, metric, isolated_session_maker)
+            )
+            loop.run_until_complete(isolated_engine.dispose())
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
+
+        logger.info(
+            "Prophet tuning completed",
+            config_id=config_id,
+            metric=metric,
+            entities_tuned=result.get("entities_tuned", 0),
+        )
+
+        return {"status": "success", **result}
+
+    except Exception as e:
+        logger.error(
+            "Prophet tuning failed",
+            config_id=config_id,
+            metric=metric,
+            error=str(e),
+        )
+        raise
+
+
+async def _tune_prophet_for_config(
+    config_id: int,
+    metric: str,
+    session_maker,
+) -> dict:
+    """
+    Tune Prophet for all entities with sufficient data in a config.
+    """
+    from projects.ml.services.data_service import DataService
+    from projects.ml.db.repositories.insights_repo import InsightsRepository
+    from projects.ml.algorithms.models.timeseries.prophet_tuner import ProphetTuner
+    from shared.config import settings
+
+    results = {
+        "entities_tuned": 0,
+        "entities_skipped": 0,
+        "by_entity_type": {},
+    }
+
+    async with session_maker() as session:
+        data_service = DataService(session)
+        insights_repo = InsightsRepository(session)
+
+        for entity_type in ["campaign", "adset", "ad"]:
+            entities = await insights_repo.get_active_entities(
+                config_id=config_id,
+                entity_type=entity_type,
+            )
+
+            tuned_count = 0
+            skipped_count = 0
+
+            for entity in entities:
+                entity_id = _get_entity_id_from_record(entity, entity_type)
+
+                # Get historical data
+                df = await data_service.get_entity_daily_data(
+                    config_id=config_id,
+                    entity_type=entity_type,
+                    entity_id=entity_id,
+                    days=60,
+                )
+
+                if len(df) < 30:
+                    skipped_count += 1
+                    continue
+
+                # Prepare data for Prophet
+                prophet_df = df[['date', metric]].rename(
+                    columns={'date': 'ds', metric: 'y'}
+                ).dropna()
+
+                if len(prophet_df) < 30:
+                    skipped_count += 1
+                    continue
+
+                try:
+                    tuner = ProphetTuner(metric=metric)
+                    result = tuner.tune(prophet_df)
+
+                    # Save params
+                    params_path = (
+                        Path(settings.models_storage_path) /
+                        "prophet_params" /
+                        f"config_{config_id}" /
+                        f"{entity_type}_{entity_id}_{metric}.json"
+                    )
+                    tuner.save_params(params_path)
+                    tuned_count += 1
+
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to tune {entity_type} {entity_id}: {e}"
+                    )
+                    skipped_count += 1
+
+            results["by_entity_type"][entity_type] = {
+                "tuned": tuned_count,
+                "skipped": skipped_count,
+            }
+            results["entities_tuned"] += tuned_count
+            results["entities_skipped"] += skipped_count
+
+    return results
+
+
+def _get_entity_id_from_record(entity, entity_type: str) -> str:
+    """Extract entity ID from database record."""
+    if entity_type == "campaign":
+        return entity.campaign_id
+    elif entity_type == "adset":
+        return entity.adset_id
+    else:
+        return entity.ad_id
+
+
+@celery_app.task(
+    name="projects.ml.jobs.training_tasks.tune_prophet_all",
+    max_retries=1,
+)
+def tune_prophet_all(metric: str = 'cpl'):
+    """Dispatch Prophet tuning for all active configs."""
+    from sqlalchemy.orm import sessionmaker
+    from shared.db.models.famachat_readonly import SistemaFacebookAdsConfig
+
+    logger.info("Starting Prophet tuning for all configs", metric=metric)
+
+    Session = sessionmaker(bind=sync_engine)
+    session = Session()
+
+    try:
+        configs = session.query(SistemaFacebookAdsConfig).filter(
+            SistemaFacebookAdsConfig.is_active == True
+        ).all()
+
+        results = []
+        for config in configs:
+            logger.info(
+                "Dispatching Prophet tuning",
+                config_id=config.id,
+                name=config.name,
+            )
+            task = tune_prophet_for_config.delay(config.id, metric)
+            results.append({"config_id": config.id, "task_id": task.id})
+
+        logger.info(
+            "Prophet tuning tasks dispatched",
+            configs_count=len(configs),
+        )
+
+        return {"status": "dispatched", "configs_count": len(configs), "tasks": results}
+    finally:
+        session.close()
