@@ -109,6 +109,22 @@ celery_app.conf.update(
             "options": {"queue": "training"},
         },
 
+        # Tune Prophet hyperparameters weekly on Sunday 02:00 (CPL)
+        "weekly-prophet-tuning-cpl": {
+            "task": "projects.ml.jobs.training_tasks.tune_prophet_all",
+            "schedule": crontab(day_of_week=0, hour=2, minute=0),
+            "args": ("cpl",),
+            "options": {"queue": "training"},
+        },
+
+        # Tune Prophet hyperparameters weekly on Sunday 02:30 (Leads)
+        "weekly-prophet-tuning-leads": {
+            "task": "projects.ml.jobs.training_tasks.tune_prophet_all",
+            "schedule": crontab(day_of_week=0, hour=2, minute=30),
+            "args": ("leads",),
+            "options": {"queue": "training"},
+        },
+
         # ==================== ADSET LEVEL ====================
         # Classificar adsets diariamente às 06:30
         "daily-adset-classification": {
