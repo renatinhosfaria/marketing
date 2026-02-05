@@ -57,3 +57,34 @@ class TestTrainCampaignClassifier:
         result = train_campaign_classifier(config_id=1)
 
         assert result["status"] == "insufficient_data"
+
+
+class TestTrainClassifiersAll:
+    """Tests for train_classifiers_all dispatcher task."""
+
+    @patch('projects.ml.jobs.training_tasks.sync_engine')
+    @patch('projects.ml.jobs.training_tasks.train_campaign_classifier')
+    @patch('sqlalchemy.orm.sessionmaker')
+    def test_dispatches_tasks_for_active_configs(
+        self,
+        mock_sessionmaker,
+        mock_train_task,
+        mock_engine,
+    ):
+        """Should dispatch training tasks for all active configs."""
+        from projects.ml.jobs.training_tasks import train_classifiers_all
+
+        # Mock the session and query
+        mock_session = MagicMock()
+        mock_config1 = MagicMock(id=1, name="Config 1")
+        mock_config2 = MagicMock(id=2, name="Config 2")
+        mock_session.query.return_value.filter.return_value.all.return_value = [
+            mock_config1, mock_config2
+        ]
+        mock_sessionmaker.return_value = lambda: mock_session
+
+        result = train_classifiers_all()
+
+        assert result["status"] == "dispatched"
+        assert result["configs_count"] == 2
+        assert len(result["tasks"]) == 6  # 2 configs * 3 entity types

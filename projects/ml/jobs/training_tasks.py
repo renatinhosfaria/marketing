@@ -230,6 +230,66 @@ async def _train_classifier_for_config(
 
 
 @celery_app.task(
+    name="projects.ml.jobs.training_tasks.train_classifiers_all",
+    max_retries=1,
+    soft_time_limit=300,
+    time_limit=600,
+)
+def train_classifiers_all():
+    """
+    Train classifiers for all active configs.
+    Dispatches individual training tasks per config.
+    """
+    from sqlalchemy.orm import sessionmaker
+    from shared.db.models.famachat_readonly import SistemaFacebookAdsConfig
+
+    logger.info("Starting classifier training for all configs")
+
+    Session = sessionmaker(bind=sync_engine)
+    session = Session()
+
+    try:
+        configs = session.query(SistemaFacebookAdsConfig).filter(
+            SistemaFacebookAdsConfig.is_active == True
+        ).all()
+
+        results = []
+        for config in configs:
+            logger.info(
+                "Dispatching classifier training",
+                config_id=config.id,
+                name=config.name,
+            )
+
+            # Train for all entity types
+            for entity_type in ["campaign", "adset", "ad"]:
+                task_result = train_campaign_classifier.delay(
+                    config_id=config.id,
+                    entity_type=entity_type,
+                )
+                results.append({
+                    "config_id": config.id,
+                    "entity_type": entity_type,
+                    "task_id": task_result.id,
+                })
+
+        logger.info(
+            "Classifier training tasks dispatched",
+            configs_count=len(configs),
+            total_tasks=len(results),
+        )
+
+        return {
+            "status": "dispatched",
+            "configs_count": len(configs),
+            "tasks": results,
+        }
+
+    finally:
+        session.close()
+
+
+@celery_app.task(
     name="projects.ml.jobs.training_tasks.train_anomaly_detector",
     max_retries=2,
     soft_time_limit=1800,  # 30 minutes soft limit
