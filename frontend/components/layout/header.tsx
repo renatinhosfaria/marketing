@@ -15,7 +15,7 @@ export function Header() {
   // Encontra o titulo mais especifico que corresponde ao pathname atual
   const title = Object.entries(pageTitles)
     .sort(([a], [b]) => b.length - a.length)
-    .find(([path]) => pathname.startsWith(path))?.[1] || "FamaChat ML";
+    .find(([path]) => pathname.startsWith(path))?.[1] || "Marketing";
 
   return (
     <header className="flex h-14 items-center border-b bg-card px-6 md:px-8">

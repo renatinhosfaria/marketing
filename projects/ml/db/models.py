@@ -516,3 +516,56 @@ class MLTrainingJob(Base):
         Index("ix_ml_training_jobs_config", "config_id", "model_type"),
         {"extend_existing": True},
     )
+
+
+class MLClassificationFeedback(Base):
+    """
+    User feedback on classification accuracy.
+    Used to improve model training by providing real labels.
+    """
+
+    __tablename__ = "ml_classification_feedback"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    config_id: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    # Entity information
+    entity_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    entity_type: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="campaign"
+    )
+
+    # Original classification
+    original_tier: Mapped[CampaignTier] = mapped_column(
+        Enum(CampaignTier), nullable=False
+    )
+    original_classification_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("ml_classifications.id", ondelete="SET NULL")
+    )
+
+    # User correction
+    correct_tier: Mapped[CampaignTier] = mapped_column(
+        Enum(CampaignTier), nullable=False
+    )
+    feedback_reason: Mapped[Optional[str]] = mapped_column(String(500))
+
+    # Metadata
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_valid: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_ml_feedback_config_entity",
+            "config_id",
+            "entity_type",
+            "entity_id",
+        ),
+        Index("ix_ml_feedback_user", "user_id"),
+        Index("ix_ml_feedback_valid", "config_id", "is_valid"),
+        {"extend_existing": True},
+    )

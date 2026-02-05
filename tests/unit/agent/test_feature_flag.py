@@ -10,7 +10,7 @@ class TestFeatureFlag:
 
     def test_multi_agent_disabled_by_default(self):
         """Multi-agent deve estar desabilitado por padrao."""
-        from app.agent.config import AgentSettings
+        from projects.agent.config import AgentSettings
 
         settings = AgentSettings()
         assert settings.multi_agent_enabled is False
@@ -18,7 +18,7 @@ class TestFeatureFlag:
     def test_multi_agent_can_be_enabled(self):
         """Multi-agent pode ser habilitado via env var."""
         with patch.dict(os.environ, {"AGENT_MULTI_AGENT_ENABLED": "true"}):
-            from app.agent.config import AgentSettings
+            from projects.agent.config import AgentSettings
             settings = AgentSettings()
             # Nota: Pydantic pode cachear, entao pode precisar de reload
             assert True  # Placeholder
@@ -26,7 +26,7 @@ class TestFeatureFlag:
     def test_environment_variables_documented(self):
         """Variaveis de ambiente devem estar documentadas."""
         # Verifica se as vars existem no codigo
-        from app.agent.config import AgentSettings
+        from projects.agent.config import AgentSettings
 
         settings = AgentSettings()
 

@@ -8,12 +8,12 @@ class TestParseRequest:
 
     def test_parse_request_import(self):
         """parse_request deve ser importavel."""
-        from app.agent.orchestrator.nodes.parse_request import parse_request
+        from projects.agent.orchestrator.nodes.parse_request import parse_request
         assert parse_request is not None
 
     def test_detect_intent_analyze(self):
         """detect_intent deve identificar intencao de analise."""
-        from app.agent.orchestrator.nodes.parse_request import detect_intent
+        from projects.agent.orchestrator.nodes.parse_request import detect_intent
 
         assert detect_intent("Como esta a performance?") == "analyze_performance"
         assert detect_intent("Analise minhas campanhas") == "analyze_performance"
@@ -21,7 +21,7 @@ class TestParseRequest:
 
     def test_detect_intent_problems(self):
         """detect_intent deve identificar busca por problemas."""
-        from app.agent.orchestrator.nodes.parse_request import detect_intent
+        from projects.agent.orchestrator.nodes.parse_request import detect_intent
 
         assert detect_intent("Tem algum problema?") == "find_problems"
         assert detect_intent("Quais anomalias existem?") == "find_problems"
@@ -29,7 +29,7 @@ class TestParseRequest:
 
     def test_detect_intent_recommendations(self):
         """detect_intent deve identificar pedido de recomendacoes."""
-        from app.agent.orchestrator.nodes.parse_request import detect_intent
+        from projects.agent.orchestrator.nodes.parse_request import detect_intent
 
         assert detect_intent("O que devo fazer?") == "get_recommendations"
         assert detect_intent("Quais sao suas recomendacoes?") == "get_recommendations"
@@ -37,7 +37,7 @@ class TestParseRequest:
 
     def test_detect_intent_forecast(self):
         """detect_intent deve identificar pedido de previsao."""
-        from app.agent.orchestrator.nodes.parse_request import detect_intent
+        from projects.agent.orchestrator.nodes.parse_request import detect_intent
 
         assert detect_intent("Qual a previsao para semana?") == "predict_future"
         assert detect_intent("Como vai ser o CPL?") == "predict_future"
@@ -45,28 +45,28 @@ class TestParseRequest:
 
     def test_detect_intent_compare(self):
         """detect_intent deve identificar comparacao."""
-        from app.agent.orchestrator.nodes.parse_request import detect_intent
+        from projects.agent.orchestrator.nodes.parse_request import detect_intent
 
         assert detect_intent("Compare campanha A com B") == "compare_campaigns"
         assert detect_intent("Qual e melhor entre X e Y?") == "compare_campaigns"
 
     def test_detect_intent_full_report(self):
         """detect_intent deve identificar relatorio completo."""
-        from app.agent.orchestrator.nodes.parse_request import detect_intent
+        from projects.agent.orchestrator.nodes.parse_request import detect_intent
 
         assert detect_intent("Me de um relatorio completo") == "full_report"
         assert detect_intent("Resumo geral de tudo") == "full_report"
 
     def test_detect_intent_fallback(self):
         """detect_intent deve retornar general para mensagens genericas."""
-        from app.agent.orchestrator.nodes.parse_request import detect_intent
+        from projects.agent.orchestrator.nodes.parse_request import detect_intent
 
         assert detect_intent("Ola") == "general"
         assert detect_intent("Obrigado") == "general"
 
     def test_parse_request_sets_user_intent(self):
         """parse_request deve retornar user_intent no estado."""
-        from app.agent.orchestrator.nodes.parse_request import parse_request
+        from projects.agent.orchestrator.nodes.parse_request import parse_request
         from langchain_core.messages import HumanMessage
 
         state = {

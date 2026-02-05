@@ -71,8 +71,9 @@ class SyncBreakdownsService:
                 )
 
                 try:
+                    acct_id = config.account_id if config.account_id.startswith("act_") else f"act_{config.account_id}"
                     fb_insights = await insights_client.get_insights(
-                        f"act_{config.account_id}",
+                        acct_id,
                         time_range=time_range,
                         level="ad",
                         fields=BREAKDOWN_FIELDS,

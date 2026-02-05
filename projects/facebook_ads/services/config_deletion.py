@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from projects.agent.db.models import AgentCheckpoint, AgentConversation, AgentWrite
@@ -29,64 +29,74 @@ from shared.db.models.famachat_readonly import (
     SistemaFacebookAdsInsightsHistory,
     SistemaFacebookAdsInsightsToday,
 )
+from shared.core.logging import get_logger
+
+logger = get_logger(__name__)
+
+_OPTIONAL_DELETE_TABLES = {
+    MLFacebookAdsManagementLog.__tablename__,
+    MLFacebookAdsRateLimitLog.__tablename__,
+    SistemaFacebookAdsSyncHistory.__tablename__,
+}
+
+
+async def _get_missing_tables(db: AsyncSession, table_names: set[str]) -> set[str]:
+    missing: set[str] = set()
+    for table_name in table_names:
+        result = await db.execute(
+            text("SELECT to_regclass(:table_name)"),
+            {"table_name": table_name},
+        )
+        if result.scalar() is None:
+            missing.add(table_name)
+    return missing
 
 
 def build_hard_delete_statements(
     config_id: int,
     thread_ids: Sequence[str],
+    skip_tables: set[str] | None = None,
 ):
     statements = []
+    skip_tables = skip_tables or set()
+
+    def should_include(table_name: str) -> bool:
+        return table_name not in skip_tables
 
     if thread_ids:
-        statements.append(
-            delete(AgentCheckpoint).where(AgentCheckpoint.thread_id.in_(thread_ids))
-        )
-        statements.append(
-            delete(AgentWrite).where(AgentWrite.thread_id.in_(thread_ids))
-        )
+        if should_include(AgentCheckpoint.__tablename__):
+            statements.append(
+                delete(AgentCheckpoint).where(AgentCheckpoint.thread_id.in_(thread_ids))
+            )
+        if should_include(AgentWrite.__tablename__):
+            statements.append(
+                delete(AgentWrite).where(AgentWrite.thread_id.in_(thread_ids))
+            )
 
-    statements.extend(
-        [
-            delete(AgentConversation).where(AgentConversation.config_id == config_id),
-            delete(MLPrediction).where(MLPrediction.config_id == config_id),
-            delete(MLCampaignClassification).where(
-                MLCampaignClassification.config_id == config_id
-            ),
-            delete(MLRecommendation).where(MLRecommendation.config_id == config_id),
-            delete(MLAnomaly).where(MLAnomaly.config_id == config_id),
-            delete(MLFeature).where(MLFeature.config_id == config_id),
-            delete(MLForecast).where(MLForecast.config_id == config_id),
-            delete(MLTrainingJob).where(MLTrainingJob.config_id == config_id),
-            delete(MLTrainedModel).where(MLTrainedModel.config_id == config_id),
-            delete(MLFacebookAdsManagementLog).where(
-                MLFacebookAdsManagementLog.config_id == config_id
-            ),
-            delete(MLFacebookAdsRateLimitLog).where(
-                MLFacebookAdsRateLimitLog.config_id == config_id
-            ),
-            delete(SistemaFacebookAdsSyncHistory).where(
-                SistemaFacebookAdsSyncHistory.config_id == config_id
-            ),
-            delete(SistemaFacebookAdsInsightsToday).where(
-                SistemaFacebookAdsInsightsToday.config_id == config_id
-            ),
-            delete(SistemaFacebookAdsInsightsHistory).where(
-                SistemaFacebookAdsInsightsHistory.config_id == config_id
-            ),
-            delete(SistemaFacebookAdsAds).where(
-                SistemaFacebookAdsAds.config_id == config_id
-            ),
-            delete(SistemaFacebookAdsAdsets).where(
-                SistemaFacebookAdsAdsets.config_id == config_id
-            ),
-            delete(SistemaFacebookAdsCampaigns).where(
-                SistemaFacebookAdsCampaigns.config_id == config_id
-            ),
-            delete(SistemaFacebookAdsConfig).where(
-                SistemaFacebookAdsConfig.id == config_id
-            ),
-        ]
-    )
+    delete_statements = [
+        (AgentConversation, AgentConversation.config_id == config_id),
+        (MLPrediction, MLPrediction.config_id == config_id),
+        (MLCampaignClassification, MLCampaignClassification.config_id == config_id),
+        (MLRecommendation, MLRecommendation.config_id == config_id),
+        (MLAnomaly, MLAnomaly.config_id == config_id),
+        (MLFeature, MLFeature.config_id == config_id),
+        (MLForecast, MLForecast.config_id == config_id),
+        (MLTrainingJob, MLTrainingJob.config_id == config_id),
+        (MLTrainedModel, MLTrainedModel.config_id == config_id),
+        (MLFacebookAdsManagementLog, MLFacebookAdsManagementLog.config_id == config_id),
+        (MLFacebookAdsRateLimitLog, MLFacebookAdsRateLimitLog.config_id == config_id),
+        (SistemaFacebookAdsSyncHistory, SistemaFacebookAdsSyncHistory.config_id == config_id),
+        (SistemaFacebookAdsInsightsToday, SistemaFacebookAdsInsightsToday.config_id == config_id),
+        (SistemaFacebookAdsInsightsHistory, SistemaFacebookAdsInsightsHistory.config_id == config_id),
+        (SistemaFacebookAdsAds, SistemaFacebookAdsAds.config_id == config_id),
+        (SistemaFacebookAdsAdsets, SistemaFacebookAdsAdsets.config_id == config_id),
+        (SistemaFacebookAdsCampaigns, SistemaFacebookAdsCampaigns.config_id == config_id),
+        (SistemaFacebookAdsConfig, SistemaFacebookAdsConfig.id == config_id),
+    ]
+
+    for model, condition in delete_statements:
+        if should_include(model.__tablename__):
+            statements.append(delete(model).where(condition))
 
     return statements
 
@@ -99,5 +109,17 @@ async def hard_delete_config(db: AsyncSession, config_id: int) -> None:
     )
     thread_ids = result.scalars().all()
 
-    for statement in build_hard_delete_statements(config_id, thread_ids):
+    missing_tables = await _get_missing_tables(db, _OPTIONAL_DELETE_TABLES)
+    if missing_tables:
+        logger.warning(
+            "Tabelas ausentes durante hard delete de config",
+            config_id=config_id,
+            missing_tables=sorted(missing_tables),
+        )
+
+    for statement in build_hard_delete_statements(
+        config_id,
+        thread_ids,
+        skip_tables=missing_tables,
+    ):
         await db.execute(statement)

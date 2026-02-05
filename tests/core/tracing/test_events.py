@@ -1,7 +1,7 @@
 # tests/core/tracing/test_events.py
 import pytest
 from unittest.mock import patch
-from app.core.tracing.events import (
+from shared.core.tracing.events import (
     log_orchestrator_request_received,
     log_intent_detected,
     log_subagents_selected,
@@ -15,7 +15,7 @@ from app.core.tracing.events import (
     log_results_collection_end,
     log_synthesis_start
 )
-from app.core.tracing.context import set_trace_context
+from shared.core.tracing.context import set_trace_context
 
 
 def test_log_orchestrator_request_received():

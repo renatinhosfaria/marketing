@@ -81,6 +81,7 @@ export interface CampaignWithMetrics extends Campaign {
   leads: number;
   ctr: number;
   cpc: number;
+  cpm: number;
   cpl: number | null;
   cpp: number | null;
   uniqueCtr: number | null;
@@ -113,6 +114,7 @@ export interface AdSetWithMetrics extends AdSet {
   leads: number;
   ctr: number;
   cpc: number;
+  cpm: number;
   cpl: number | null;
 }
 
@@ -140,6 +142,7 @@ export interface AdWithMetrics extends Ad {
   leads: number;
   ctr: number;
   cpc: number;
+  cpm: number;
   cpl: number | null;
 }
 

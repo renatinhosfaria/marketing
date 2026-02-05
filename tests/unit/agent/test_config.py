@@ -8,7 +8,7 @@ import importlib.util
 config_path = os.path.join(
     os.path.dirname(__file__),
     '..', '..', '..',
-    'app', 'agent', 'config.py'
+    'projects', 'agent', 'config.py'
 )
 config_path = os.path.abspath(config_path)
 

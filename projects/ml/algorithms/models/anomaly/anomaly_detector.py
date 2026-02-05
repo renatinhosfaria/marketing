@@ -18,6 +18,7 @@ import pandas as pd
 from scipy import stats
 from pathlib import Path
 import joblib
+from cachetools import TTLCache
 
 # Try to import Isolation Forest
 try:
@@ -134,17 +135,23 @@ class AnomalyDetector:
         self.isolation_forest_model: Optional[object] = None
         self.isolation_forest_features: list[str] = []
 
-        # Model cache for loaded models (key: "config_id:entity_type:entity_id")
-        self._models_cache: dict[str, tuple[object, list[str]]] = {}
+        # Model cache with bounded size and TTL (max 100 models, 1 hour TTL)
+        self._models_cache: TTLCache = TTLCache(maxsize=100, ttl=3600)
 
         if use_isolation_forest and not ISOLATION_FOREST_AVAILABLE:
             logger.warning("Isolation Forest requested but sklearn not available")
 
+    def _sanitize_filename(self, name: str) -> str:
+        """Remove potentially dangerous characters from filenames."""
+        import re
+        return re.sub(r'[^a-zA-Z0-9_-]', '_', str(name))
+
     def get_model_path(self, config_id: int, entity_type: str, entity_id: str) -> Path:
         """Get filesystem path for a model."""
         from shared.config import settings
+        safe_entity_id = self._sanitize_filename(entity_id)
         base_path = Path(settings.models_storage_path) / "anomaly_detector" / f"config_{config_id}"
-        return base_path / f"{entity_type}_{entity_id}.joblib"
+        return base_path / f"{entity_type}_{safe_entity_id}.joblib"
 
     def save_model(self, config_id: int, entity_type: str, entity_id: str) -> bool:
         """
@@ -176,7 +183,12 @@ class AnomalyDetector:
                 'entity_type': entity_type,
                 'entity_id': entity_id,
             }
-            joblib.dump(model_data, model_path)
+
+            # Atomic write: write to temp file first, then rename
+            import os
+            temp_path = model_path.with_suffix('.tmp')
+            joblib.dump(model_data, temp_path)
+            os.replace(temp_path, model_path)
 
             logger.info(
                 "Model saved",
@@ -222,6 +234,11 @@ class AnomalyDetector:
 
         try:
             model_data = joblib.load(model_path)
+
+            # Validate required keys exist
+            if not isinstance(model_data, dict) or not all(k in model_data for k in ['model', 'features']):
+                raise ValueError("Invalid model format: missing required keys")
+
             self.isolation_forest_model = model_data['model']
             self.isolation_forest_features = model_data['features']
 
@@ -239,6 +256,14 @@ class AnomalyDetector:
             )
             return True
 
+        except (KeyError, ValueError, EOFError) as e:
+            logger.error(
+                "Corrupted model file detected, removing",
+                error=str(e),
+                path=str(model_path)
+            )
+            model_path.unlink(missing_ok=True)
+            return False
         except Exception as e:
             logger.error(
                 "Failed to load model",
@@ -279,11 +304,12 @@ class AnomalyDetector:
 
         # Prepare training data
         X = training_data[available_features].dropna()
-        if len(X) < 50:
+        from shared.config import settings
+        if len(X) < settings.isolation_forest_min_samples:
             logger.warning(
                 "Insufficient data for Isolation Forest training",
                 samples=len(X),
-                required=50
+                required=settings.isolation_forest_min_samples
             )
             return False
 

@@ -335,7 +335,7 @@ class InsightsClient:
         date_preset: str = "last_30d",
     ) -> list[dict]:
         """Shortcut para insights no nível da conta."""
-        entity_id = f"act_{ad_account_id}"
+        entity_id = ad_account_id if ad_account_id.startswith("act_") else f"act_{ad_account_id}"
         return await self.get_insights(
             entity_id,
             time_range=time_range,

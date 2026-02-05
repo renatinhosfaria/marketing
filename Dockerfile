@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.4
-# FamaChat ML - Microservico de Machine Learning
+# Marketing - Microservico de Machine Learning
 # Build otimizado com uv e BuildKit cache
 
 # ==================== BUILD STAGE ====================
@@ -31,7 +31,7 @@ RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
 FROM python:3.11-slim AS production
 
 # Metadata
-LABEL maintainer="FamaChat Team"
+LABEL maintainer="Marketing Team"
 LABEL description="Microservico de ML para otimizacao de Facebook Ads"
 LABEL version="1.0.0"
 
@@ -39,10 +39,12 @@ LABEL version="1.0.0"
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
-    TZ=America/Sao_Paulo
+    TZ=America/Sao_Paulo \
+    HOME=/home/marketing \
+    MPLCONFIGDIR=/home/marketing/.config/matplotlib
 
-# Criar usuario nao-root
-RUN groupadd -r famachat && useradd -r -g famachat famachat
+# Criar usuario nao-root com home
+RUN groupadd -r marketing && useradd -r -g marketing -m -d /home/marketing marketing
 
 WORKDIR /app
 
@@ -59,17 +61,19 @@ COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copiar codigo da aplicacao
-COPY --chown=famachat:famachat app/ ./app/
-COPY --chown=famachat:famachat scripts/ ./scripts/
-COPY --chown=famachat:famachat alembic/ ./alembic/
-COPY --chown=famachat:famachat alembic.ini .
+COPY --chown=marketing:marketing shared/ ./shared/
+COPY --chown=marketing:marketing projects/ ./projects/
+COPY --chown=marketing:marketing app/ ./app/
+COPY --chown=marketing:marketing scripts/ ./scripts/
+COPY --chown=marketing:marketing alembic/ ./alembic/
+COPY --chown=marketing:marketing alembic.ini .
 
 # Criar diretorios necessarios
-RUN mkdir -p /app/models_storage /app/logs && \
-    chown -R famachat:famachat /app
+RUN mkdir -p /app/models_storage /app/logs /home/marketing/.config/matplotlib && \
+    chown -R marketing:marketing /app /home/marketing
 
 # Trocar para usuario nao-root
-USER famachat
+USER marketing
 
 # Expor porta
 EXPOSE 8000

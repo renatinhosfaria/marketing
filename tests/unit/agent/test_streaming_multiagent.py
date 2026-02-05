@@ -8,7 +8,7 @@ class TestMultiAgentStreaming:
 
     def test_multiagent_event_types(self):
         """Tipos de eventos multi-agent devem existir."""
-        from app.api.v1.agent.schemas import StreamChunkType
+        from projects.agent.api.schemas import StreamChunkType
 
         # Verificar que enum existe
         assert hasattr(StreamChunkType, 'INTENT_DETECTED') or True  # Placeholder
@@ -18,7 +18,7 @@ class TestMultiAgentStreaming:
 
     def test_format_sse_event(self):
         """format_sse_event deve formatar eventos corretamente."""
-        from app.agent.service import format_sse_event
+        from projects.agent.service import format_sse_event
 
         event = format_sse_event(
             event_type="subagent_start",

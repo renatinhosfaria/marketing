@@ -1,5 +1,5 @@
 """
-FamaChat ML - Entry point da aplicação FastAPI.
+Marketing - Entry point da aplicação FastAPI.
 Microserviço de Machine Learning para otimização de Facebook Ads.
 """
 
@@ -8,11 +8,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import settings
-from app.core.logging import setup_logging
-from app.core.tracing.middleware import TraceMiddleware
-from app.api.v1.router import api_router
-from app.db.session import engine, check_database_connection
+from shared.config import settings
+from shared.core.logging import setup_logging
+from shared.core.tracing.middleware import TraceMiddleware
+from shared.infrastructure.middleware.rate_limit import RateLimitMiddleware, RateLimitConfig
+from app.router import api_router
+from shared.db.session import engine, check_database_connection
 
 
 # Configurar logging estruturado
@@ -28,7 +29,7 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     logger.info(
-        "Iniciando FamaChat ML",
+        "Iniciando Marketing",
         version=settings.app_version,
         environment=settings.environment
     )
@@ -43,7 +44,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown
-    logger.info("Encerrando FamaChat ML")
+    logger.info("Encerrando Marketing")
     await engine.dispose()
 
 
@@ -77,11 +78,27 @@ app.add_middleware(TraceMiddleware)
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Em produção, especificar origens permitidas
+    allow_origins=[
+        "https://www.famachat.com.br",
+        "https://famachat.com.br",
+        "https://marketing.famachat.com.br",
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Adicionar rate limiting
+rate_limit_config = RateLimitConfig(
+    requests_per_minute=settings.rate_limit_requests_per_minute,
+    requests_per_hour=settings.rate_limit_requests_per_hour,
+    burst_limit=settings.rate_limit_burst,
+    enabled=settings.rate_limit_enabled,
+)
+app.add_middleware(RateLimitMiddleware, config=rate_limit_config)
 
 # Incluir rotas da API v1
 app.include_router(api_router, prefix="/api/v1")

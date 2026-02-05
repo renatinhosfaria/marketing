@@ -8,13 +8,13 @@ class TestDispatch:
 
     def test_dispatch_import(self):
         """dispatch_agents deve ser importavel."""
-        from app.agent.orchestrator.nodes.dispatch import dispatch_agents
+        from projects.agent.orchestrator.nodes.dispatch import dispatch_agents
         assert dispatch_agents is not None
 
     def test_dispatch_returns_send_list(self):
         """dispatch_agents deve retornar lista de Send."""
-        from app.agent.orchestrator.nodes.dispatch import dispatch_agents
-        from app.agent.orchestrator.state import create_initial_orchestrator_state
+        from projects.agent.orchestrator.nodes.dispatch import dispatch_agents
+        from projects.agent.orchestrator.state import create_initial_orchestrator_state
 
         state = create_initial_orchestrator_state(
             config_id=1,
@@ -39,8 +39,8 @@ class TestDispatch:
 
     def test_dispatch_creates_correct_send_objects(self):
         """dispatch_agents deve criar objetos Send corretos."""
-        from app.agent.orchestrator.nodes.dispatch import dispatch_agents
-        from app.agent.orchestrator.state import create_initial_orchestrator_state
+        from projects.agent.orchestrator.nodes.dispatch import dispatch_agents
+        from projects.agent.orchestrator.state import create_initial_orchestrator_state
         from langgraph.constants import Send
 
         state = create_initial_orchestrator_state(
@@ -69,8 +69,8 @@ class TestDispatch:
 
     def test_dispatch_empty_agents(self):
         """dispatch_agents deve retornar lista vazia se nao houver agentes."""
-        from app.agent.orchestrator.nodes.dispatch import dispatch_agents
-        from app.agent.orchestrator.state import create_initial_orchestrator_state
+        from projects.agent.orchestrator.nodes.dispatch import dispatch_agents
+        from projects.agent.orchestrator.state import create_initial_orchestrator_state
 
         state = create_initial_orchestrator_state(
             config_id=1,
@@ -86,6 +86,6 @@ class TestDispatch:
 
     def test_create_subagent_node_import(self):
         """create_subagent_node deve ser importavel."""
-        from app.agent.orchestrator.nodes.dispatch import create_subagent_node
+        from projects.agent.orchestrator.nodes.dispatch import create_subagent_node
 
         assert callable(create_subagent_node)

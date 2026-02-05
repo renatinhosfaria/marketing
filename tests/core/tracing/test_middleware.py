@@ -3,8 +3,8 @@ import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
-from app.core.tracing.middleware import TraceMiddleware
-from app.core.tracing.context import get_trace_context
+from shared.core.tracing.middleware import TraceMiddleware
+from shared.core.tracing.context import get_trace_context
 
 
 def test_middleware_generates_trace_id_when_not_provided():

@@ -8,12 +8,12 @@ class TestSynthesize:
 
     def test_synthesize_import(self):
         """synthesize deve ser importavel."""
-        from app.agent.orchestrator.nodes.synthesize import synthesize
+        from projects.agent.orchestrator.nodes.synthesize import synthesize
         assert synthesize is not None
 
     def test_format_results_for_synthesis(self):
         """format_results_for_synthesis deve formatar resultados."""
-        from app.agent.orchestrator.nodes.synthesize import format_results_for_synthesis
+        from projects.agent.orchestrator.nodes.synthesize import format_results_for_synthesis
 
         results = {
             "classification": {
@@ -35,7 +35,7 @@ class TestSynthesize:
 
     def test_prioritize_results(self):
         """prioritize_results deve ordenar por prioridade."""
-        from app.agent.orchestrator.nodes.synthesize import prioritize_results
+        from projects.agent.orchestrator.nodes.synthesize import prioritize_results
 
         results = {
             "classification": {"success": True},
@@ -50,7 +50,7 @@ class TestSynthesize:
 
     def test_get_synthesis_prompt(self):
         """get_synthesis_prompt deve retornar prompt valido."""
-        from app.agent.orchestrator.prompts import get_synthesis_prompt
+        from projects.agent.orchestrator.prompts import get_synthesis_prompt
 
         prompt = get_synthesis_prompt()
 

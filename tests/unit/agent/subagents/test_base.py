@@ -22,7 +22,7 @@ if root_path not in sys.path:
 state_path = os.path.join(
     os.path.dirname(__file__),
     '..', '..', '..', '..',
-    'app', 'agent', 'subagents', 'state.py'
+    'projects', 'agent', 'subagents', 'state.py'
 )
 state_path = os.path.abspath(state_path)
 
@@ -40,7 +40,7 @@ create_initial_subagent_state = subagent_state.create_initial_subagent_state
 base_path = os.path.join(
     os.path.dirname(__file__),
     '..', '..', '..', '..',
-    'app', 'agent', 'subagents', 'base.py'
+    'projects', 'agent', 'subagents', 'base.py'
 )
 base_path = os.path.abspath(base_path)
 
@@ -72,8 +72,8 @@ def load_base_module():
     # Isso evita que o import relativo tente carregar app.agent
 
     # Primeiro, criar o pacote app.agent.subagents fake se necessario
-    if 'app' not in sys.modules:
-        sys.modules['app'] = types.ModuleType('app')
+    if 'projects' not in sys.modules:
+        sys.modules['projects'] = types.ModuleType('projects')
     if 'app.agent' not in sys.modules:
         agent_mod = types.ModuleType('app.agent')
         sys.modules['app.agent'] = agent_mod

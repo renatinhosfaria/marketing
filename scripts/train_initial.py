@@ -11,10 +11,10 @@ from datetime import datetime, timedelta
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy.orm import sessionmaker
-from app.db.session import sync_engine
-from app.db.models.famachat_readonly import SistemaFacebookAdsConfig
-from app.db.models.ml_models import MLTrainedModel, ModelType, ModelStatus
-from app.core.logging import setup_logging, get_logger
+from shared.db.session import sync_engine
+from shared.db.models.famachat_readonly import SistemaFacebookAdsConfig
+from projects.ml.db.models import MLTrainedModel, ModelType, ModelStatus
+from shared.core.logging import setup_logging, get_logger
 
 setup_logging("INFO")
 logger = get_logger(__name__)
@@ -36,7 +36,7 @@ def get_active_configs():
 
 def count_insights(config_id: int) -> int:
     """Conta registros de insights para uma configuração."""
-    from app.db.models.famachat_readonly import SistemaFacebookAdsInsightsHistory
+    from shared.db.models.famachat_readonly import SistemaFacebookAdsInsightsHistory
 
     session = Session()
     try:
@@ -51,14 +51,14 @@ def count_insights(config_id: int) -> int:
 def main():
     """Função principal."""
     logger.info("=" * 60)
-    logger.info("FamaChat ML - Treinamento Inicial")
+    logger.info("Marketing - Treinamento Inicial")
     logger.info("=" * 60)
 
     # Obter configs
     configs = get_active_configs()
     if not configs:
         logger.warning("Nenhuma configuração de Facebook Ads ativa encontrada")
-        logger.info("Adicione configurações no FamaChat antes de treinar modelos")
+        logger.info("Adicione configurações de Facebook Ads antes de treinar modelos")
         return
 
     logger.info(f"Encontradas {len(configs)} configurações ativas")

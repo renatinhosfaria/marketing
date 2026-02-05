@@ -11,7 +11,7 @@ from typing import get_type_hints
 state_path = os.path.join(
     os.path.dirname(__file__),
     '..', '..', '..', '..',
-    'app', 'agent', 'subagents', 'state.py'
+    'projects', 'agent', 'subagents', 'state.py'
 )
 state_path = os.path.abspath(state_path)
 

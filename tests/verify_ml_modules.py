@@ -16,11 +16,11 @@ os.environ.pop("flower_user", None)
 os.environ.pop("flower_user", None)
 os.environ.pop("flower_password", None)
 
-from app.ml.models.recommendation.rule_engine import RuleEngine, Recommendation, create_rule_engine
-from app.services.feature_engineering import CampaignFeatures
-from app.db.models.ml_models import RecommendationType, CampaignTier, ModelType
-from app.ml.models.classification.campaign_classifier import CampaignClassifier, classifier
-from app.ml.models.timeseries.forecaster import TimeSeriesForecaster, forecaster
+from projects.ml.algorithms.models.recommendation.rule_engine import RuleEngine, Recommendation, create_rule_engine
+from projects.ml.services.feature_engineering import CampaignFeatures
+from projects.ml.db.models import RecommendationType, CampaignTier, ModelType
+from projects.ml.algorithms.models.classification.campaign_classifier import CampaignClassifier, classifier
+from projects.ml.algorithms.models.timeseries.forecaster import TimeSeriesForecaster, forecaster
 
 # --- Utility: Mock Data Generators ---
 

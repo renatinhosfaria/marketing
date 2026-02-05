@@ -16,8 +16,8 @@ import time
 def get_logs_for_trace(trace_id: str) -> List[Dict]:
     """Extrai todos os logs de um trace_id específico"""
     result = subprocess.run(
-        ["docker-compose", "logs", "--no-color", "famachat-ml-api"],
-        cwd="/var/www/famachat-ml",
+        ["docker-compose", "logs", "--no-color", "marketing-api"],
+        cwd="/var/www/marketing",
         capture_output=True,
         text=True
     )

@@ -4,7 +4,7 @@
  * Hooks para o módulo Facebook Ads
  * Story 2.6 / 3.1: Hooks para sincronização e dados
  *
- * As chamadas são feitas diretamente ao microserviço famachat-ml (Python/FastAPI).
+ * As chamadas são feitas diretamente ao microserviço Marketing (Python/FastAPI).
  * A URL base é /api/v1/facebook-ads.
  */
 
@@ -268,8 +268,18 @@ export function useInsightsSummary(params: {
           avgCtr: 0,
           avgCpc: 0,
           avgCpl: 0,
+          avgCpm: 0,
+          totalUniqueClicks: 0,
+          avgCpp: 0,
+          avgUniqueCtr: 0,
+          avgPurchaseRoas: null,
         };
       }
+
+      // Calcular CPM: (spend / impressions) * 1000
+      const cpm = apiData.metrics.impressions > 0
+        ? (apiData.metrics.spend / apiData.metrics.impressions) * 1000
+        : 0;
 
       return {
         totalSpend: apiData.metrics.spend || 0,
@@ -280,6 +290,11 @@ export function useInsightsSummary(params: {
         avgCtr: apiData.metrics.ctr || 0,
         avgCpc: apiData.metrics.cpc || 0,
         avgCpl: apiData.metrics.cpl || 0,
+        avgCpm: cpm,
+        totalUniqueClicks: apiData.metrics.unique_clicks || 0,
+        avgCpp: apiData.metrics.cpp || 0,
+        avgUniqueCtr: apiData.metrics.unique_ctr || 0,
+        avgPurchaseRoas: apiData.metrics.purchase_roas || null,
         comparison: apiData.comparison
           ? {
               spendChange: apiData.comparison.spend || 0,
@@ -289,6 +304,7 @@ export function useInsightsSummary(params: {
               ctrChange: apiData.comparison.ctr || 0,
               cpcChange: apiData.comparison.cpc || 0,
               cplChange: apiData.comparison.cpl || 0,
+              cpmChange: apiData.comparison.cpm || 0,
             }
           : undefined,
       };

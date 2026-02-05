@@ -176,7 +176,7 @@ _setup_mock_modules()
 
 # Agora importar o modulo de servico
 import importlib.util
-service_path = os.path.join(root_path, 'app', 'agent', 'service.py')
+service_path = os.path.join(root_path, 'projects', 'agent', 'service.py')
 spec = importlib.util.spec_from_file_location("agent_service_streaming_test", service_path)
 service_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(service_module)

@@ -1,7 +1,7 @@
 """Endpoints CRUD para configuração de contas Facebook Ads."""
 
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, func
@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.db.session import get_db
 from shared.core.logging import get_logger
 from shared.db.models.famachat_readonly import SistemaFacebookAdsConfig
-from projects.facebook_ads.middleware.access_control import require_gestor_access
 from projects.facebook_ads.schemas.config import (
     ConfigResponse,
     ConfigCreateRequest,
@@ -59,7 +58,6 @@ def _config_to_response(config: SistemaFacebookAdsConfig) -> dict:
 @router.get("")
 async def list_configs(
     db: AsyncSession = Depends(get_db),
-    current_user: Dict[str, Any] = Depends(require_gestor_access),
 ):
     """Lista todas as configurações de contas."""
     result = await db.execute(
@@ -78,7 +76,6 @@ async def list_configs(
 async def get_config(
     config_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: Dict[str, Any] = Depends(require_gestor_access),
 ):
     """Busca uma configuração específica."""
     result = await db.execute(
@@ -98,7 +95,6 @@ async def get_config(
 async def create_config(
     request: ConfigCreateRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: Dict[str, Any] = Depends(require_gestor_access),
 ):
     """Cria nova configuração de conta."""
     encrypted_token = encrypt_token(request.access_token)
@@ -112,7 +108,7 @@ async def create_config(
         is_active=True,
         sync_enabled=request.sync_enabled,
         sync_frequency_minutes=request.sync_frequency_minutes,
-        created_by=current_user.get("id", 0),
+        created_by=1,
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
     )
@@ -129,7 +125,6 @@ async def update_config(
     config_id: int,
     request: ConfigUpdateRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: Dict[str, Any] = Depends(require_gestor_access),
 ):
     """Atualiza configuração existente."""
     result = await db.execute(
@@ -158,7 +153,6 @@ async def delete_config(
     config_id: int,
     hard_delete: bool = Query(False, alias="hardDelete"),
     db: AsyncSession = Depends(get_db),
-    current_user: Dict[str, Any] = Depends(require_gestor_access),
 ):
     """Desativa uma configuração (soft delete) ou exclui permanentemente."""
     result = await db.execute(
@@ -191,7 +185,6 @@ async def delete_config(
 async def test_config(
     config_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: Dict[str, Any] = Depends(require_gestor_access),
 ):
     """Testa conexão com a conta do Facebook Ads."""
     result = await db.execute(
@@ -210,7 +203,7 @@ async def test_config(
 
         try:
             response = await client.get(
-                f"act_{config.account_id}",
+                config.account_id if config.account_id.startswith("act_") else f"act_{config.account_id}",
                 params={"fields": "name,currency,timezone_name,account_status"},
             )
 
@@ -241,7 +234,6 @@ async def test_config(
 async def list_ad_accounts(
     config_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: Dict[str, Any] = Depends(require_gestor_access),
 ):
     """Lista ad accounts disponíveis para o token da configuração."""
     result = await db.execute(

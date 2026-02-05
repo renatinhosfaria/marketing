@@ -16,11 +16,13 @@ from projects.ml.db.models import (
     CampaignTier,
     MLClassification,
     MLCampaignClassification,  # Alias for backward compatibility
+    MLClassificationFeedback,
     ModelType,
     JobStatus,
 )
 from shared.core.logging import get_logger
 from projects.ml.services.classification_service import ClassificationService
+from projects.ml.services.label_service import LabelService
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -127,6 +129,39 @@ class TrainResponse(BaseModel):
     metrics: Optional[dict] = None
     job_id: Optional[int] = None
     message: Optional[str] = None
+
+
+class FeedbackRequest(BaseModel):
+    """Request to provide feedback on a classification."""
+
+    classification_id: int = Field(..., description="ID da classificação original")
+    correct_tier: str = Field(
+        ..., description="Tier correto (HIGH_PERFORMER, MODERATE, LOW, UNDERPERFORMER)"
+    )
+    reason: Optional[str] = Field(None, max_length=500, description="Motivo da correção")
+
+
+class FeedbackResponse(BaseModel):
+    """Response for feedback submission."""
+
+    id: int
+    classification_id: int
+    entity_id: str
+    entity_type: str
+    original_tier: str
+    correct_tier: str
+    message: str
+
+
+class FeedbackStatsResponse(BaseModel):
+    """Response for feedback statistics."""
+
+    config_id: int
+    total_feedbacks: int
+    by_original_tier: dict[str, int]
+    by_correct_tier: dict[str, int]
+    corrections: int
+    correction_rate: float
 
 
 # ==================== ENDPOINTS ====================
@@ -331,7 +366,8 @@ async def get_campaign_classification(
 
     classification = await ml_repo.get_latest_classification(
         config_id=config_id,
-        campaign_id=campaign_id
+        entity_id=campaign_id,
+        entity_type="campaign"
     )
 
     if not classification:
@@ -342,7 +378,10 @@ async def get_campaign_classification(
 
     return ClassificationResponse(
         id=classification.id,
-        campaign_id=classification.campaign_id,
+        config_id=classification.config_id,
+        entity_id=classification.entity_id,
+        entity_type=classification.entity_type,
+        campaign_id=classification.entity_id,  # Backward compatibility
         tier=classification.tier.value,
         confidence_score=classification.confidence_score,
         metrics_snapshot=classification.metrics_snapshot,
@@ -672,4 +711,100 @@ async def get_classification_summary(
             )
             for c in top_items
         ],
+    )
+
+
+# ==================== FEEDBACK ENDPOINTS ====================
+
+
+@router.post("/feedback", response_model=FeedbackResponse)
+async def submit_classification_feedback(
+    request: FeedbackRequest,
+    user_id: int = Query(..., description="ID do usuário fornecendo feedback"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Submit feedback on a classification.
+
+    This helps improve model accuracy over time by providing real labels
+    that can be used in future training iterations.
+
+    - **classification_id**: ID of the original classification
+    - **correct_tier**: The correct tier according to user judgment
+    - **reason**: Optional explanation for the correction
+    - **user_id**: ID of the user providing feedback
+    """
+    ml_repo = MLRepository(db)
+
+    # Get original classification
+    classification = await ml_repo.get_classification_by_id(request.classification_id)
+    if not classification:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Classification not found: {request.classification_id}",
+        )
+
+    # Validate tier
+    try:
+        correct_tier = CampaignTier(request.correct_tier)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid tier: {request.correct_tier}. Options: {[t.value for t in CampaignTier]}",
+        )
+
+    # Create feedback using LabelService
+    label_service = LabelService(db)
+    feedback = await label_service.record_feedback(
+        config_id=classification.config_id,
+        entity_id=classification.entity_id,
+        entity_type=classification.entity_type,
+        original_tier=classification.tier,
+        correct_tier=correct_tier,
+        user_id=user_id,
+        classification_id=classification.id,
+        reason=request.reason,
+    )
+    await db.commit()
+
+    logger.info(
+        "Classification feedback submitted",
+        classification_id=request.classification_id,
+        original_tier=classification.tier.value,
+        correct_tier=correct_tier.value,
+        user_id=user_id,
+    )
+
+    return FeedbackResponse(
+        id=feedback.id,
+        classification_id=classification.id,
+        entity_id=classification.entity_id,
+        entity_type=classification.entity_type,
+        original_tier=classification.tier.value,
+        correct_tier=correct_tier.value,
+        message="Feedback recorded. It will be used to improve future classifications.",
+    )
+
+
+@router.get("/feedback/stats", response_model=FeedbackStatsResponse)
+async def get_feedback_stats(
+    config_id: int = Query(..., description="ID da configuração"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get statistics about classification feedback.
+
+    Shows how many feedbacks have been submitted and the distribution
+    of corrections, which helps monitor model performance.
+    """
+    label_service = LabelService(db)
+    stats = await label_service.get_feedback_stats(config_id)
+
+    return FeedbackStatsResponse(
+        config_id=config_id,
+        total_feedbacks=stats.get("total_feedbacks", 0),
+        by_original_tier=stats.get("by_original_tier", {}),
+        by_correct_tier=stats.get("by_correct_tier", {}),
+        corrections=stats.get("corrections", 0),
+        correction_rate=stats.get("correction_rate", 0.0),
     )

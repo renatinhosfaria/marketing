@@ -3,7 +3,7 @@ import pytest
 from unittest.mock import Mock
 from langchain_core.tools import BaseTool
 
-from app.agent.subagents.base import BaseSubagent
+from projects.agent.subagents.base import BaseSubagent
 
 
 class MockSubagent(BaseSubagent):

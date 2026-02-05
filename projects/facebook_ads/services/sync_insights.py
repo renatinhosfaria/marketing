@@ -55,7 +55,7 @@ class SyncInsightsService:
 
         try:
             fb_insights = await insights_client.get_insights(
-                f"act_{config.account_id}",
+                config.account_id if config.account_id.startswith("act_") else f"act_{config.account_id}",
                 time_range=time_range,
                 level="ad",
             )
@@ -117,7 +117,7 @@ class SyncInsightsService:
         try:
             # Usa async report se período > threshold
             fb_insights = await insights_client.get_insights_smart(
-                f"act_{config.account_id}",
+                config.account_id if config.account_id.startswith("act_") else f"act_{config.account_id}",
                 time_range=time_range,
                 level="ad",
                 days_threshold=fb_settings.facebook_sync_async_threshold_days,
@@ -192,7 +192,7 @@ class SyncInsightsService:
 
         try:
             fb_insights = await insights_client.get_insights(
-                f"act_{config.account_id}",
+                config.account_id if config.account_id.startswith("act_") else f"act_{config.account_id}",
                 time_range=time_range,
                 level="ad",
             )

@@ -1,29 +1,29 @@
-# FamaChat ML - Docker Compose Otimizado
+# Marketing - Docker Compose Otimizado
 # Build unico com reutilizacao de imagem para todos os servicos
 
 services:
   # ==================== Frontend Next.js ====================
-  famachat-ml-frontend:
+  marketing-frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-}
-        - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-FamaChat ML}
+        - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-Marketing}
         - NEXT_PUBLIC_FACEBOOK_APP_ID=${FACEBOOK_APP_ID:-}
-    image: famachat-ml-frontend:latest
-    container_name: famachat-ml-frontend
+    image: marketing-frontend:latest
+    container_name: marketing-frontend
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "8000:3001"
     environment:
       - NODE_ENV=production
-      - API_INTERNAL_URL=http://famachat-ml-api:8000
+      - API_INTERNAL_URL=http://marketing-api:8000
     depends_on:
-      famachat-ml-api:
+      marketing-api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3001/"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -43,56 +43,33 @@ services:
         max-file: "5"
         compress: "true"
     networks:
-      - famachat-ml-network
+      - marketing-network
 
-  # ==================== API FastAPI ====================
-  famachat-ml-api:
-    image: famachat-ml:latest
+  # ==================== API FastAPI (ML) ====================
+  marketing-api:
+    image: marketing:latest
     build:
       context: .
       dockerfile: Dockerfile
       target: production
-    container_name: famachat-ml-api
+    container_name: marketing-api
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8001:8000"
     environment:
       - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=redis://famachat-ml-redis:6379/0
+      - REDIS_URL=redis://marketing-redis:6379/0
       - ML_API_KEY=${ML_API_KEY}
       - JWT_SECRET=${JWT_SECRET}
-      - AGENT_LLM_PROVIDER=${LLM_PROVIDER:-openai}
-      - AGENT_LLM_MODEL=${OPENAI_MODEL:-gpt-4.1-2025-04-14}
-      - AGENT_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - AGENT_OPENAI_API_KEY=${OPENAI_API_KEY}
       - MODELS_STORAGE_PATH=/app/models_storage
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - ENVIRONMENT=${ENVIRONMENT:-production}
       - DEBUG=${DEBUG:-false}
-      # Multi-Agent System
-      - AGENT_MULTI_AGENT_ENABLED=${AGENT_MULTI_AGENT_ENABLED:-false}
-      - AGENT_ORCHESTRATOR_TIMEOUT=${AGENT_ORCHESTRATOR_TIMEOUT:-120}
-      - AGENT_MAX_PARALLEL_SUBAGENTS=${AGENT_MAX_PARALLEL_SUBAGENTS:-4}
-      - AGENT_TIMEOUT_CLASSIFICATION=${AGENT_TIMEOUT_CLASSIFICATION:-30}
-      - AGENT_TIMEOUT_ANOMALY=${AGENT_TIMEOUT_ANOMALY:-30}
-      - AGENT_TIMEOUT_FORECAST=${AGENT_TIMEOUT_FORECAST:-45}
-      - AGENT_TIMEOUT_RECOMMENDATION=${AGENT_TIMEOUT_RECOMMENDATION:-30}
-      - AGENT_TIMEOUT_CAMPAIGN=${AGENT_TIMEOUT_CAMPAIGN:-20}
-      - AGENT_TIMEOUT_ANALYSIS=${AGENT_TIMEOUT_ANALYSIS:-45}
-      - AGENT_SYNTHESIS_MAX_TOKENS=${AGENT_SYNTHESIS_MAX_TOKENS:-4096}
-      - AGENT_SYNTHESIS_TEMPERATURE=${AGENT_SYNTHESIS_TEMPERATURE:-0.3}
-      - AGENT_SUBAGENT_MAX_RETRIES=${AGENT_SUBAGENT_MAX_RETRIES:-2}
-      - AGENT_SUBAGENT_RETRY_DELAY=${AGENT_SUBAGENT_RETRY_DELAY:-1.0}
-      # Logging Detalhado
-      - AGENT_DETAILED_LOGGING=${AGENT_DETAILED_LOGGING:-false}
-      - AGENT_LOG_FULL_PROMPTS=${AGENT_LOG_FULL_PROMPTS:-false}
-      - AGENT_LOG_FULL_RESPONSES=${AGENT_LOG_FULL_RESPONSES:-false}
-      - AGENT_LOG_FULL_TOOL_DATA=${AGENT_LOG_FULL_TOOL_DATA:-false}
     volumes:
       - ./models_storage:/app/models_storage
       - ./logs:/app/logs
     depends_on:
-      famachat-ml-redis:
+      marketing-redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
@@ -111,39 +88,161 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-size: "100m"      # Máximo por arquivo
-        max-file: "10"        # Mantém 10 arquivos = 1GB total
-        compress: "true"      # Comprime arquivos antigos
+        max-size: "100m"
+        max-file: "10"
+        compress: "true"
     networks:
-      - famachat-ml-network
+      - marketing-network
 
-  # ==================== Celery Worker ====================
-  famachat-ml-worker:
-    image: famachat-ml:latest
-    depends_on:
-      famachat-ml-api:
-        condition: service_healthy
-    container_name: famachat-ml-worker
+  # ==================== Agent IA (FastAPI separado) ====================
+  marketing-agent:
+    image: marketing:latest
+    container_name: marketing-agent
     restart: unless-stopped
-    command: >
-      celery -A app.celery worker
-      --loglevel=info
-      --concurrency=2
-      --queues=default,training,ml
+    ports:
+      - "8002:8001"
+    command: ["uvicorn", "app.agent_main:app", "--host", "0.0.0.0", "--port", "8001"]
     environment:
       - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=redis://famachat-ml-redis:6379/0
+      - REDIS_URL=redis://marketing-redis:6379/0
       - ML_API_KEY=${ML_API_KEY}
       - JWT_SECRET=${JWT_SECRET}
+      # LLM Keys
       - AGENT_LLM_PROVIDER=${LLM_PROVIDER:-openai}
       - AGENT_LLM_MODEL=${OPENAI_MODEL:-gpt-4.1-2025-04-14}
       - AGENT_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - AGENT_OPENAI_API_KEY=${OPENAI_API_KEY}
+      # Multi-Agent System
+      - AGENT_MULTI_AGENT_ENABLED=${AGENT_MULTI_AGENT_ENABLED:-false}
+      - AGENT_ORCHESTRATOR_TIMEOUT=${AGENT_ORCHESTRATOR_TIMEOUT:-120}
+      - AGENT_MAX_PARALLEL_SUBAGENTS=${AGENT_MAX_PARALLEL_SUBAGENTS:-4}
+      - AGENT_TIMEOUT_CLASSIFICATION=${AGENT_TIMEOUT_CLASSIFICATION:-30}
+      - AGENT_TIMEOUT_ANOMALY=${AGENT_TIMEOUT_ANOMALY:-30}
+      - AGENT_TIMEOUT_FORECAST=${AGENT_TIMEOUT_FORECAST:-45}
+      - AGENT_TIMEOUT_RECOMMENDATION=${AGENT_TIMEOUT_RECOMMENDATION:-30}
+      - AGENT_TIMEOUT_CAMPAIGN=${AGENT_TIMEOUT_CAMPAIGN:-20}
+      - AGENT_TIMEOUT_ANALYSIS=${AGENT_TIMEOUT_ANALYSIS:-45}
+      - AGENT_SYNTHESIS_MAX_TOKENS=${AGENT_SYNTHESIS_MAX_TOKENS:-4096}
+      - AGENT_SYNTHESIS_TEMPERATURE=${AGENT_SYNTHESIS_TEMPERATURE:-0.3}
+      - AGENT_SUBAGENT_MAX_RETRIES=${AGENT_SUBAGENT_MAX_RETRIES:-2}
+      - AGENT_SUBAGENT_RETRY_DELAY=${AGENT_SUBAGENT_RETRY_DELAY:-1.0}
+      # Logging
+      - AGENT_DETAILED_LOGGING=${AGENT_DETAILED_LOGGING:-false}
+      - AGENT_LOG_FULL_PROMPTS=${AGENT_LOG_FULL_PROMPTS:-false}
+      - AGENT_LOG_FULL_RESPONSES=${AGENT_LOG_FULL_RESPONSES:-false}
+      - AGENT_LOG_FULL_TOOL_DATA=${AGENT_LOG_FULL_TOOL_DATA:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DEBUG=${DEBUG:-false}
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      marketing-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+        compress: "true"
+    networks:
+      - marketing-network
+
+  # ==================== Facebook Ads (FastAPI separado) ====================
+  marketing-fb-ads:
+    image: marketing:latest
+    container_name: marketing-fb-ads
+    restart: unless-stopped
+    ports:
+      - "8003:8002"
+    command: ["uvicorn", "app.fb_ads_main:app", "--host", "0.0.0.0", "--port", "8002"]
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://marketing-redis:6379/0
+      - ML_API_KEY=${ML_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - FACEBOOK_APP_ID=${FACEBOOK_APP_ID:-}
+      - FACEBOOK_APP_SECRET=${FACEBOOK_APP_SECRET:-}
+      - FACEBOOK_OAUTH_CALLBACK_URL=${FACEBOOK_OAUTH_CALLBACK_URL:-}
+      - FACEBOOK_OAUTH_FRONTEND_REDIRECT_URL=${FACEBOOK_OAUTH_FRONTEND_REDIRECT_URL:-}
+      - FACEBOOK_TOKEN_ENCRYPTION_KEY=${FACEBOOK_TOKEN_ENCRYPTION_KEY:-}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DEBUG=${DEBUG:-false}
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      marketing-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/api/v1/facebook-ads/health/simple"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+        compress: "true"
+    networks:
+      - marketing-network
+
+  # ==================== Celery Worker ML (filas: training, ml) ====================
+  marketing-worker:
+    image: marketing:latest
+    depends_on:
+      marketing-api:
+        condition: service_healthy
+    container_name: marketing-worker
+    restart: unless-stopped
+    ports:
+      - "8004:8004"
+    command: >
+      celery -A app.celery worker
+      --loglevel=info
+      --concurrency=2
+      --queues=training,ml
+      --hostname=ml-worker@%h
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://marketing-redis:6379/0
+      - ML_API_KEY=${ML_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
       - MODELS_STORAGE_PATH=/app/models_storage
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
       - ./models_storage:/app/models_storage
       - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.celery inspect ping -d ml-worker@$$HOSTNAME --timeout 10 2>/dev/null | grep -q pong || exit 1"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 40s
     deploy:
       resources:
         limits:
@@ -153,43 +252,96 @@ services:
           cpus: '0.5'
           memory: 1G
     networks:
-      - famachat-ml-network
+      - marketing-network
+
+  # ==================== Celery Worker Facebook Ads (fila: default) ====================
+  marketing-fb-ads-worker:
+    image: marketing:latest
+    depends_on:
+      marketing-redis:
+        condition: service_healthy
+    container_name: marketing-fb-ads-worker
+    restart: unless-stopped
+    ports:
+      - "8005:8005"
+    command: >
+      celery -A app.celery worker
+      --loglevel=info
+      --concurrency=2
+      --queues=default
+      --hostname=fb-ads-worker@%h
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://marketing-redis:6379/0
+      - ML_API_KEY=${ML_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - FACEBOOK_APP_ID=${FACEBOOK_APP_ID:-}
+      - FACEBOOK_APP_SECRET=${FACEBOOK_APP_SECRET:-}
+      - FACEBOOK_TOKEN_ENCRYPTION_KEY=${FACEBOOK_TOKEN_ENCRYPTION_KEY:-}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.celery inspect ping -d fb-ads-worker@$$HOSTNAME --timeout 10 2>/dev/null | grep -q pong || exit 1"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - marketing-network
 
   # ==================== Celery Beat (Scheduler) ====================
-  famachat-ml-beat:
-    image: famachat-ml:latest
+  marketing-beat:
+    image: marketing:latest
     depends_on:
-      famachat-ml-api:
+      marketing-api:
         condition: service_healthy
-    container_name: famachat-ml-beat
+    container_name: marketing-beat
     restart: unless-stopped
+    ports:
+      - "8006:8006"
     command: >
       celery -A app.celery beat
       --loglevel=info
       --scheduler celery.beat:PersistentScheduler
-      --schedule=/app/celerybeat-schedule
+      --schedule=/var/run/celery/celerybeat-schedule
     environment:
       - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=redis://famachat-ml-redis:6379/0
+      - REDIS_URL=redis://marketing-redis:6379/0
       - ML_API_KEY=${ML_API_KEY}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
-      - celerybeat_schedule:/app
+      - celerybeat_schedule:/var/run/celery
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.celery inspect ping --timeout 10 2>/dev/null | grep -q pong || exit 1"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
           cpus: '0.5'
           memory: 256M
     networks:
-      - famachat-ml-network
+      - marketing-network
 
   # ==================== Redis ====================
-  famachat-ml-redis:
+  marketing-redis:
     image: redis:7-alpine
-    container_name: famachat-ml-redis
+    container_name: marketing-redis
     restart: unless-stopped
     ports:
-      - "6380:6379"
+      - "8007:6379"
     volumes:
       - redis_ml_data:/data
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
@@ -204,15 +356,16 @@ services:
           cpus: '0.5'
           memory: 512M
     networks:
-      - famachat-ml-network
+      - marketing-network
 
   # ==================== Flower (Monitoramento Celery) ====================
-  famachat-ml-flower:
-    image: famachat-ml:latest
+  marketing-flower:
+    image: marketing:latest
     depends_on:
-      - famachat-ml-redis
-      - famachat-ml-worker
-    container_name: famachat-ml-flower
+      - marketing-redis
+      - marketing-worker
+      - marketing-fb-ads-worker
+    container_name: marketing-flower
     restart: unless-stopped
     command: >
       celery -A app.celery flower
@@ -220,18 +373,24 @@ services:
       --basic_auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD}
       --url_prefix=flower
     environment:
-      - REDIS_URL=redis://famachat-ml-redis:6379/0
+      - REDIS_URL=redis://marketing-redis:6379/0
       - FLOWER_USER=${FLOWER_USER:-admin}
       - FLOWER_PASSWORD=${FLOWER_PASSWORD}
     ports:
       - "5555:5555"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5555/flower/healthcheck || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
           cpus: '0.25'
           memory: 256M
     networks:
-      - famachat-ml-network
+      - marketing-network
 
 # ==================== VOLUMES ====================
 volumes:
@@ -242,5 +401,5 @@ volumes:
 
 # ==================== NETWORKS ====================
 networks:
-  famachat-ml-network:
+  marketing-network:
     driver: bridge

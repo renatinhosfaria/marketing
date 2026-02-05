@@ -8,7 +8,7 @@ class TestMultiAgentService:
 
     def test_should_use_multiagent(self):
         """should_use_multiagent deve verificar configuração."""
-        from app.agent.service import should_use_multiagent
+        from projects.agent.service import should_use_multiagent
 
         # Deve retornar baseado na configuração
         result = should_use_multiagent()
@@ -16,7 +16,7 @@ class TestMultiAgentService:
 
     def test_get_agent_returns_orchestrator_when_enabled(self):
         """get_agent deve retornar orchestrator quando multi-agent habilitado."""
-        from app.agent.service import get_agent
+        from projects.agent.service import get_agent
 
         with patch('app.agent.service.should_use_multiagent', return_value=True):
             agent = get_agent()
@@ -25,7 +25,7 @@ class TestMultiAgentService:
 
     def test_get_agent_returns_legacy_when_disabled(self):
         """get_agent deve retornar agente legado quando desabilitado."""
-        from app.agent.service import get_agent
+        from projects.agent.service import get_agent
 
         with patch('app.agent.service.should_use_multiagent', return_value=False):
             agent = get_agent()
@@ -35,7 +35,7 @@ class TestMultiAgentService:
     @pytest.mark.asyncio
     async def test_chat_uses_multiagent_when_enabled(self):
         """chat deve usar multi-agent quando habilitado."""
-        from app.agent.service import TrafficAgentService
+        from projects.agent.service import TrafficAgentService
 
         service = TrafficAgentService()
 

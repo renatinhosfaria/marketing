@@ -11,8 +11,8 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import text
-from app.db.session import sync_engine, Base
-from app.db.models.ml_models import (
+from shared.db.session import sync_engine, Base
+from projects.ml.db.models import (
     MLTrainedModel,
     MLPrediction,
     MLCampaignClassification,
@@ -22,7 +22,7 @@ from app.db.models.ml_models import (
     MLFeature,
     MLForecast,
 )
-from app.core.logging import setup_logging, get_logger
+from shared.core.logging import setup_logging, get_logger
 
 setup_logging("INFO")
 logger = get_logger(__name__)
@@ -69,9 +69,9 @@ def create_ml_tables():
         return False
 
 
-def verify_famachat_tables():
-    """Verifica se as tabelas do FamaChat existem (read-only)."""
-    logger.info("Verificando tabelas do FamaChat...")
+def verify_readonly_tables():
+    """Verifica se as tabelas read-only existem."""
+    logger.info("Verificando tabelas read-only...")
 
     required_tables = [
         "sistema_facebook_ads_config",
@@ -108,7 +108,7 @@ def verify_famachat_tables():
 def main():
     """Função principal."""
     logger.info("=" * 60)
-    logger.info("FamaChat ML - Inicialização do Banco de Dados")
+    logger.info("Marketing - Inicialização do Banco de Dados")
     logger.info("=" * 60)
 
     # 1. Verificar conexão
@@ -116,8 +116,8 @@ def main():
         logger.error("Falha na conexão. Verifique DATABASE_URL no .env")
         sys.exit(1)
 
-    # 2. Verificar tabelas do FamaChat
-    verify_famachat_tables()
+    # 2. Verificar tabelas read-only
+    verify_readonly_tables()
 
     # 3. Criar tabelas de ML
     if not create_ml_tables():

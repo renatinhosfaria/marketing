@@ -24,7 +24,9 @@ from projects.ml.algorithms.models.classification.campaign_classifier import (
     CampaignClassifier,
     ClassificationResult,
     create_training_labels,
+    get_classifier,
 )
+from projects.ml.services.model_cache import model_cache
 from shared.config import settings
 from shared.core.logging import get_logger
 
@@ -75,8 +77,19 @@ class ClassificationService:
             force_reclassify=force_reclassify
         )
 
-        # Verificação de dados desabilitada temporariamente
-        logger.info("Verificação de dados desabilitada temporariamente", config_id=config_id)
+        # Verificar disponibilidade mínima de dados
+        data_availability = await self.data_service.check_data_availability(
+            config_id, min_days=7
+        )
+        if not data_availability.get('has_sufficient_data', False):
+            logger.warning(
+                "Dados insuficientes para classificação de entidades",
+                config_id=config_id,
+                entity_type=entity_type,
+                days_available=data_availability.get('days_with_data', 0),
+                min_required=7
+            )
+            # Continuar mesmo com dados insuficientes, mas logar o aviso
 
         # Obter métricas de referência
         avg_metrics = await self.data_service.get_aggregated_metrics(config_id, days=14)
@@ -298,49 +311,72 @@ class ClassificationService:
     async def train_classifier(
         self,
         config_id: int,
-        min_samples: int = 30
+        min_samples: int = 30,
+        prefer_real_feedback: bool = True,
     ) -> Optional[dict]:
         """
         Treina o classificador com dados históricos.
-        
+        Uses LabelService to prefer real feedback over heuristics when available.
+
         Args:
             config_id: ID da configuração
             min_samples: Mínimo de campanhas para treinar
-            
+            prefer_real_feedback: If True, prefer user feedback over heuristics
+
         Returns:
             Dict com métricas de treinamento ou None se dados insuficientes
         """
+        from projects.ml.services.label_service import LabelService
+
         logger.info(
             "Iniciando treinamento do classificador",
             config_id=config_id,
-            min_samples=min_samples
+            min_samples=min_samples,
+            prefer_real_feedback=prefer_real_feedback,
         )
-        
+
         # Obter features de todas as campanhas (incluindo pausadas)
         features_list = await self.data_service.get_all_campaign_features(
             config_id, active_only=False
         )
-        
+
         if len(features_list) < min_samples:
             logger.warning(
                 "Dados insuficientes para treinamento",
                 available=len(features_list),
-                required=min_samples
+                required=min_samples,
             )
             return None
-        
+
         # Obter métricas de referência
         avg_metrics = await self.data_service.get_aggregated_metrics(config_id, days=30)
-        avg_cpl = avg_metrics.get('avg_cpl', 50.0)
-        avg_ctr = avg_metrics.get('avg_ctr', 1.0)
-        
-        # Criar labels usando heurísticas
-        labels = create_training_labels(features_list, avg_cpl)
-        
-        # Treinar
-        metrics = self.classifier.train(
-            features_list, labels, avg_cpl, avg_ctr
+        avg_cpl = avg_metrics.get("avg_cpl", 50.0)
+        avg_ctr = avg_metrics.get("avg_ctr", 1.0)
+
+        # Get labels using LabelService (prefers real feedback over heuristics)
+        label_service = LabelService(self.session)
+        labels, sources = await label_service.get_training_labels(
+            features_list, avg_cpl, prefer_real_feedback
         )
+
+        # Track label source distribution for transparency
+        source_distribution = {}
+        for s in sources:
+            source_distribution[s.value] = source_distribution.get(s.value, 0) + 1
+
+        logger.info(
+            "Training labels prepared",
+            config_id=config_id,
+            total_samples=len(labels),
+            label_sources=source_distribution,
+        )
+
+        # Treinar
+        metrics = self.classifier.train(features_list, labels, avg_cpl, avg_ctr)
+
+        # Add label source distribution to metrics for tracking
+        metrics["label_sources"] = source_distribution
+        metrics["feedback_ratio"] = source_distribution.get("user", 0) / len(labels) if labels else 0
         
         # Salvar modelo
         model_path = f"{settings.models_storage_path}/classifier_config{config_id}_v{datetime.now().strftime('%Y%m%d%H%M%S')}.joblib"
@@ -393,26 +429,54 @@ class ClassificationService:
     
     async def _load_active_model(self, config_id: int) -> bool:
         """
-        Carrega modelo ativo do banco.
-        
+        Carrega modelo ativo do banco, usando cache quando possível.
+
         Returns:
             True se modelo carregado com sucesso
         """
+        cache_key_type = "classifier"
+
+        # Check cache first
+        cached_classifier = model_cache.get(cache_key_type, config_id)
+        if cached_classifier is not None:
+            self.classifier = cached_classifier
+            logger.debug(
+                "Classifier loaded from cache",
+                config_id=config_id
+            )
+            return True
+
+        # Load from database
         model = await self.ml_repo.get_active_model(
             ModelType.CAMPAIGN_CLASSIFIER, config_id
         )
-        
+
         if not model:
             logger.debug("Nenhum modelo ativo encontrado", config_id=config_id)
             return False
-        
+
         try:
+            # Create new classifier instance and load model
+            self.classifier = get_classifier()
             self.classifier.load(model.model_path)
-            
+
+            # Store in cache
+            model_cache.set(
+                cache_key_type,
+                config_id,
+                self.classifier,
+                model.model_path
+            )
+
             # Atualizar last_used_at
             model.last_used_at = datetime.utcnow()
             await self.session.flush()
-            
+
+            logger.info(
+                "Classifier loaded from disk and cached",
+                config_id=config_id,
+                model_path=model.model_path
+            )
             return True
         except Exception as e:
             logger.error(

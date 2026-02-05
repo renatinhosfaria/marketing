@@ -131,6 +131,9 @@ class AnomalyService:
         all_anomalies = []
         entities_analyzed = 0
 
+        # Create detector once (cache is shared across entities)
+        detector = get_anomaly_detector()
+
         # Analisar cada entidade
         for entity in entities:
             entity_id = self._get_entity_id(entity, entity_type)
@@ -149,8 +152,7 @@ class AnomalyService:
 
                 entities_analyzed += 1
 
-                # Detectar anomalias
-                detector = get_anomaly_detector()
+                # Detectar anomalias (using shared detector instance)
                 anomalies = detector.detect_anomalies(
                     df=df,
                     entity_type=entity_type,

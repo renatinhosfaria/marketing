@@ -1,8 +1,8 @@
 import pytest
 import asyncio
 from unittest.mock import patch, MagicMock
-from app.core.tracing.decorators import log_span
-from app.core.tracing.context import set_trace_context, get_trace_context
+from shared.core.tracing.decorators import log_span
+from shared.core.tracing.context import set_trace_context, get_trace_context
 
 
 @pytest.mark.asyncio

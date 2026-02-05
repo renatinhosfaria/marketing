@@ -26,6 +26,29 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
+# Presets que devem incluir dados de hoje (tabela today)
+PRESETS_WITH_TODAY = {"today", "this_month", "this_year"}
+# Presets que usam apenas dados de hoje
+PRESETS_ONLY_TODAY = {"today"}
+
+
+def _should_use_today_table(date_preset: Optional[str], date_from: Optional[str], date_to: Optional[str]) -> bool:
+    """Determina se deve incluir dados da tabela today."""
+    if date_preset in PRESETS_WITH_TODAY:
+        return True
+    # Se for range customizado que inclui hoje
+    if date_from and date_to:
+        today = get_today_sao_paulo()
+        until = datetime.strptime(date_to, "%Y-%m-%d").date()
+        return until >= today
+    return False
+
+
+def _should_use_only_today_table(date_preset: Optional[str]) -> bool:
+    """Determina se deve usar APENAS a tabela today."""
+    return date_preset in PRESETS_ONLY_TODAY
+
+
 def _parse_date_params(
     date_from: Optional[str],
     date_to: Optional[str],
@@ -67,32 +90,65 @@ async def get_kpis(
 ):
     """KPIs agregados com comparação ao período anterior."""
     since, until = _parse_date_params(date_from, date_to, date_preset)
+    
+    use_only_today = _should_use_only_today_table(date_preset)
+    use_today = _should_use_today_table(date_preset, date_from, date_to)
 
-    # Período atual
-    result = await db.execute(
-        select(
-            func.coalesce(func.sum(SistemaFacebookAdsInsightsHistory.spend), 0).label("spend"),
-            func.coalesce(func.sum(SistemaFacebookAdsInsightsHistory.impressions), 0).label("impressions"),
-            func.coalesce(func.sum(SistemaFacebookAdsInsightsHistory.reach), 0).label("reach"),
-            func.coalesce(func.sum(SistemaFacebookAdsInsightsHistory.clicks), 0).label("clicks"),
-            func.coalesce(func.sum(SistemaFacebookAdsInsightsHistory.leads), 0).label("leads"),
-            func.coalesce(func.sum(SistemaFacebookAdsInsightsHistory.conversions), 0).label("conversions"),
-        ).where(
-            and_(
-                SistemaFacebookAdsInsightsHistory.config_id == config_id,
-                SistemaFacebookAdsInsightsHistory.date >= since,
-                SistemaFacebookAdsInsightsHistory.date <= until,
+    # Inicializar métricas
+    spend = Decimal("0")
+    impressions = 0
+    reach = 0
+    clicks = 0
+    leads = 0
+    conversions = 0
+
+    # Buscar dados da tabela history (exceto se for only_today)
+    if not use_only_today:
+        result = await db.execute(
+            select(
+                func.coalesce(func.sum(SistemaFacebookAdsInsightsHistory.spend), 0).label("spend"),
+                func.coalesce(func.sum(SistemaFacebookAdsInsightsHistory.impressions), 0).label("impressions"),
+                func.coalesce(func.sum(SistemaFacebookAdsInsightsHistory.reach), 0).label("reach"),
+                func.coalesce(func.sum(SistemaFacebookAdsInsightsHistory.clicks), 0).label("clicks"),
+                func.coalesce(func.sum(SistemaFacebookAdsInsightsHistory.leads), 0).label("leads"),
+                func.coalesce(func.sum(SistemaFacebookAdsInsightsHistory.conversions), 0).label("conversions"),
+            ).where(
+                and_(
+                    SistemaFacebookAdsInsightsHistory.config_id == config_id,
+                    SistemaFacebookAdsInsightsHistory.date >= since,
+                    SistemaFacebookAdsInsightsHistory.date <= until,
+                )
             )
         )
-    )
-    row = result.one()
+        row = result.one()
+        spend = Decimal(str(row.spend))
+        impressions = int(row.impressions)
+        clicks = int(row.clicks)
+        leads = int(row.leads)
+        reach = int(row.reach)
+        conversions = int(row.conversions)
 
-    spend = Decimal(str(row.spend))
-    impressions = int(row.impressions)
-    clicks = int(row.clicks)
-    leads = int(row.leads)
-    reach = int(row.reach)
-    conversions = int(row.conversions)
+    # Adicionar dados da tabela today se necessário
+    if use_today:
+        today_result = await db.execute(
+            select(
+                func.coalesce(func.sum(SistemaFacebookAdsInsightsToday.spend), 0).label("spend"),
+                func.coalesce(func.sum(SistemaFacebookAdsInsightsToday.impressions), 0).label("impressions"),
+                func.coalesce(func.sum(SistemaFacebookAdsInsightsToday.reach), 0).label("reach"),
+                func.coalesce(func.sum(SistemaFacebookAdsInsightsToday.clicks), 0).label("clicks"),
+                func.coalesce(func.sum(SistemaFacebookAdsInsightsToday.leads), 0).label("leads"),
+                func.coalesce(func.sum(SistemaFacebookAdsInsightsToday.conversions), 0).label("conversions"),
+            ).where(
+                SistemaFacebookAdsInsightsToday.config_id == config_id,
+            )
+        )
+        today_row = today_result.one()
+        spend += Decimal(str(today_row.spend))
+        impressions += int(today_row.impressions)
+        clicks += int(today_row.clicks)
+        leads += int(today_row.leads)
+        reach += int(today_row.reach)
+        conversions += int(today_row.conversions)
 
     current_metrics = {
         "spend": float(spend),
@@ -182,49 +238,96 @@ async def get_daily_insights(
 ):
     """Série temporal diária de insights."""
     since, until = _parse_date_params(date_from, date_to, date_preset)
-
-    result = await db.execute(
-        select(
-            func.date(SistemaFacebookAdsInsightsHistory.date).label("day"),
-            func.sum(SistemaFacebookAdsInsightsHistory.spend).label("spend"),
-            func.sum(SistemaFacebookAdsInsightsHistory.impressions).label("impressions"),
-            func.sum(SistemaFacebookAdsInsightsHistory.reach).label("reach"),
-            func.sum(SistemaFacebookAdsInsightsHistory.clicks).label("clicks"),
-            func.sum(SistemaFacebookAdsInsightsHistory.leads).label("leads"),
-            func.sum(SistemaFacebookAdsInsightsHistory.conversions).label("conversions"),
-        ).where(
-            and_(
-                SistemaFacebookAdsInsightsHistory.config_id == config_id,
-                SistemaFacebookAdsInsightsHistory.date >= since,
-                SistemaFacebookAdsInsightsHistory.date <= until,
-            )
-        ).group_by(
-            func.date(SistemaFacebookAdsInsightsHistory.date)
-        ).order_by(
-            func.date(SistemaFacebookAdsInsightsHistory.date)
-        )
-    )
-    rows = result.all()
+    
+    use_only_today = _should_use_only_today_table(date_preset)
+    use_today = _should_use_today_table(date_preset, date_from, date_to)
 
     data = []
-    for row in rows:
-        spend = Decimal(str(row.spend or 0))
-        clicks = int(row.clicks or 0)
-        impressions = int(row.impressions or 0)
-        leads = int(row.leads or 0)
+    
+    # Buscar dados da tabela history (exceto se for only_today)
+    if not use_only_today:
+        result = await db.execute(
+            select(
+                func.date(SistemaFacebookAdsInsightsHistory.date).label("day"),
+                func.sum(SistemaFacebookAdsInsightsHistory.spend).label("spend"),
+                func.sum(SistemaFacebookAdsInsightsHistory.impressions).label("impressions"),
+                func.sum(SistemaFacebookAdsInsightsHistory.reach).label("reach"),
+                func.sum(SistemaFacebookAdsInsightsHistory.clicks).label("clicks"),
+                func.sum(SistemaFacebookAdsInsightsHistory.leads).label("leads"),
+                func.sum(SistemaFacebookAdsInsightsHistory.conversions).label("conversions"),
+            ).where(
+                and_(
+                    SistemaFacebookAdsInsightsHistory.config_id == config_id,
+                    SistemaFacebookAdsInsightsHistory.date >= since,
+                    SistemaFacebookAdsInsightsHistory.date <= until,
+                )
+            ).group_by(
+                func.date(SistemaFacebookAdsInsightsHistory.date)
+            ).order_by(
+                func.date(SistemaFacebookAdsInsightsHistory.date)
+            )
+        )
+        rows = result.all()
 
-        data.append({
-            "date": str(row.day),
-            "spend": float(spend),
-            "impressions": impressions,
-            "reach": int(row.reach or 0),
-            "clicks": clicks,
-            "leads": leads,
-            "conversions": int(row.conversions or 0),
-            "ctr": float(calculate_ctr(clicks, impressions) or 0),
-            "cpc": float(calculate_cpc(spend, clicks) or 0),
-            "cpl": float(calculate_cpl(spend, leads) or 0),
-        })
+        for row in rows:
+            spend = Decimal(str(row.spend or 0))
+            clicks = int(row.clicks or 0)
+            impressions = int(row.impressions or 0)
+            leads = int(row.leads or 0)
+
+            data.append({
+                "date": str(row.day),
+                "spend": float(spend),
+                "impressions": impressions,
+                "reach": int(row.reach or 0),
+                "clicks": clicks,
+                "leads": leads,
+                "conversions": int(row.conversions or 0),
+                "ctr": float(calculate_ctr(clicks, impressions) or 0),
+                "cpc": float(calculate_cpc(spend, clicks) or 0),
+                "cpl": float(calculate_cpl(spend, leads) or 0),
+            })
+
+    # Adicionar dados de hoje se necessário
+    if use_today:
+        today_result = await db.execute(
+            select(
+                func.date(SistemaFacebookAdsInsightsToday.date).label("day"),
+                func.sum(SistemaFacebookAdsInsightsToday.spend).label("spend"),
+                func.sum(SistemaFacebookAdsInsightsToday.impressions).label("impressions"),
+                func.sum(SistemaFacebookAdsInsightsToday.reach).label("reach"),
+                func.sum(SistemaFacebookAdsInsightsToday.clicks).label("clicks"),
+                func.sum(SistemaFacebookAdsInsightsToday.leads).label("leads"),
+                func.sum(SistemaFacebookAdsInsightsToday.conversions).label("conversions"),
+            ).where(
+                SistemaFacebookAdsInsightsToday.config_id == config_id,
+            ).group_by(
+                func.date(SistemaFacebookAdsInsightsToday.date)
+            )
+        )
+        today_rows = today_result.all()
+
+        for row in today_rows:
+            spend = Decimal(str(row.spend or 0))
+            clicks = int(row.clicks or 0)
+            impressions = int(row.impressions or 0)
+            leads = int(row.leads or 0)
+
+            data.append({
+                "date": str(row.day),
+                "spend": float(spend),
+                "impressions": impressions,
+                "reach": int(row.reach or 0),
+                "clicks": clicks,
+                "leads": leads,
+                "conversions": int(row.conversions or 0),
+                "ctr": float(calculate_ctr(clicks, impressions) or 0),
+                "cpc": float(calculate_cpc(spend, clicks) or 0),
+                "cpl": float(calculate_cpl(spend, leads) or 0),
+            })
+
+    # Ordenar por data
+    data.sort(key=lambda x: x["date"])
 
     return {
         "success": True,
@@ -246,32 +349,81 @@ async def get_campaign_insights(
 ):
     """Insights agregados por campanha."""
     since, until = _parse_date_params(date_from, date_to, date_preset)
+    
+    use_only_today = _should_use_only_today_table(date_preset)
+    use_today = _should_use_today_table(date_preset, date_from, date_to)
+    
+    # Dicionário para agregar dados por campanha
+    campaign_data = {}
 
-    result = await db.execute(
-        select(
-            SistemaFacebookAdsInsightsHistory.campaign_id,
-            func.sum(SistemaFacebookAdsInsightsHistory.spend).label("spend"),
-            func.sum(SistemaFacebookAdsInsightsHistory.impressions).label("impressions"),
-            func.sum(SistemaFacebookAdsInsightsHistory.reach).label("reach"),
-            func.sum(SistemaFacebookAdsInsightsHistory.clicks).label("clicks"),
-            func.sum(SistemaFacebookAdsInsightsHistory.leads).label("leads"),
-            func.sum(SistemaFacebookAdsInsightsHistory.conversions).label("conversions"),
-        ).where(
-            and_(
-                SistemaFacebookAdsInsightsHistory.config_id == config_id,
-                SistemaFacebookAdsInsightsHistory.date >= since,
-                SistemaFacebookAdsInsightsHistory.date <= until,
+    # Buscar dados da tabela history (exceto se for only_today)
+    if not use_only_today:
+        result = await db.execute(
+            select(
+                SistemaFacebookAdsInsightsHistory.campaign_id,
+                func.sum(SistemaFacebookAdsInsightsHistory.spend).label("spend"),
+                func.sum(SistemaFacebookAdsInsightsHistory.impressions).label("impressions"),
+                func.sum(SistemaFacebookAdsInsightsHistory.reach).label("reach"),
+                func.sum(SistemaFacebookAdsInsightsHistory.clicks).label("clicks"),
+                func.sum(SistemaFacebookAdsInsightsHistory.leads).label("leads"),
+                func.sum(SistemaFacebookAdsInsightsHistory.conversions).label("conversions"),
+            ).where(
+                and_(
+                    SistemaFacebookAdsInsightsHistory.config_id == config_id,
+                    SistemaFacebookAdsInsightsHistory.date >= since,
+                    SistemaFacebookAdsInsightsHistory.date <= until,
+                )
+            ).group_by(
+                SistemaFacebookAdsInsightsHistory.campaign_id
             )
-        ).group_by(
-            SistemaFacebookAdsInsightsHistory.campaign_id
-        ).order_by(
-            desc(func.sum(SistemaFacebookAdsInsightsHistory.spend))
-        ).limit(limit)
-    )
-    rows = result.all()
+        )
+        for row in result.all():
+            campaign_data[row.campaign_id] = {
+                "spend": Decimal(str(row.spend or 0)),
+                "impressions": int(row.impressions or 0),
+                "reach": int(row.reach or 0),
+                "clicks": int(row.clicks or 0),
+                "leads": int(row.leads or 0),
+                "conversions": int(row.conversions or 0),
+            }
+
+    # Adicionar dados da tabela today se necessário
+    if use_today:
+        today_result = await db.execute(
+            select(
+                SistemaFacebookAdsInsightsToday.campaign_id,
+                func.sum(SistemaFacebookAdsInsightsToday.spend).label("spend"),
+                func.sum(SistemaFacebookAdsInsightsToday.impressions).label("impressions"),
+                func.sum(SistemaFacebookAdsInsightsToday.reach).label("reach"),
+                func.sum(SistemaFacebookAdsInsightsToday.clicks).label("clicks"),
+                func.sum(SistemaFacebookAdsInsightsToday.leads).label("leads"),
+                func.sum(SistemaFacebookAdsInsightsToday.conversions).label("conversions"),
+            ).where(
+                SistemaFacebookAdsInsightsToday.config_id == config_id,
+            ).group_by(
+                SistemaFacebookAdsInsightsToday.campaign_id
+            )
+        )
+        for row in today_result.all():
+            if row.campaign_id in campaign_data:
+                campaign_data[row.campaign_id]["spend"] += Decimal(str(row.spend or 0))
+                campaign_data[row.campaign_id]["impressions"] += int(row.impressions or 0)
+                campaign_data[row.campaign_id]["reach"] += int(row.reach or 0)
+                campaign_data[row.campaign_id]["clicks"] += int(row.clicks or 0)
+                campaign_data[row.campaign_id]["leads"] += int(row.leads or 0)
+                campaign_data[row.campaign_id]["conversions"] += int(row.conversions or 0)
+            else:
+                campaign_data[row.campaign_id] = {
+                    "spend": Decimal(str(row.spend or 0)),
+                    "impressions": int(row.impressions or 0),
+                    "reach": int(row.reach or 0),
+                    "clicks": int(row.clicks or 0),
+                    "leads": int(row.leads or 0),
+                    "conversions": int(row.conversions or 0),
+                }
 
     # Buscar nomes das campanhas
-    campaign_ids = [r.campaign_id for r in rows]
+    campaign_ids = list(campaign_data.keys())
     campaigns_result = await db.execute(
         select(SistemaFacebookAdsCampaigns).where(
             SistemaFacebookAdsCampaigns.config_id == config_id,
@@ -281,28 +433,32 @@ async def get_campaign_insights(
     campaign_map = {c.campaign_id: c for c in campaigns_result.scalars().all()}
 
     data = []
-    for row in rows:
-        camp = campaign_map.get(row.campaign_id)
-        spend = Decimal(str(row.spend or 0))
-        clicks = int(row.clicks or 0)
-        impressions = int(row.impressions or 0)
-        leads = int(row.leads or 0)
+    for campaign_id, metrics in campaign_data.items():
+        camp = campaign_map.get(campaign_id)
+        spend = metrics["spend"]
+        clicks = metrics["clicks"]
+        impressions = metrics["impressions"]
+        leads = metrics["leads"]
 
         data.append(camel_keys({
-            "campaign_id": row.campaign_id,
+            "campaign_id": campaign_id,
             "campaign_name": camp.name if camp else "Desconhecida",
             "objective": camp.objective if camp else None,
             "status": camp.effective_status or camp.status if camp else None,
             "spend": float(spend),
             "impressions": impressions,
-            "reach": int(row.reach or 0),
+            "reach": metrics["reach"],
             "clicks": clicks,
             "leads": leads,
-            "conversions": int(row.conversions or 0),
+            "conversions": metrics["conversions"],
             "ctr": float(calculate_ctr(clicks, impressions) or 0),
             "cpc": float(calculate_cpc(spend, clicks) or 0),
             "cpl": float(calculate_cpl(spend, leads) or 0),
         }))
+
+    # Ordenar por spend (desc) e limitar
+    data.sort(key=lambda x: x.get("spend", 0), reverse=True)
+    data = data[:limit]
 
     return {"success": True, "data": data, "meta": camel_keys({"period": date_preset, "total": len(data)})}
 

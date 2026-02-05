@@ -7,12 +7,12 @@ class TestPlanExecution:
 
     def test_plan_execution_import(self):
         """plan_execution deve ser importavel."""
-        from app.agent.orchestrator.nodes.plan_execution import plan_execution
+        from projects.agent.orchestrator.nodes.plan_execution import plan_execution
         assert plan_execution is not None
 
     def test_create_execution_plan_analyze(self):
         """Deve criar plano para analyze_performance."""
-        from app.agent.orchestrator.nodes.plan_execution import create_execution_plan
+        from projects.agent.orchestrator.nodes.plan_execution import create_execution_plan
 
         plan = create_execution_plan("analyze_performance", config_id=1)
 
@@ -23,7 +23,7 @@ class TestPlanExecution:
 
     def test_create_execution_plan_full_report(self):
         """Deve criar plano completo para full_report."""
-        from app.agent.orchestrator.nodes.plan_execution import create_execution_plan
+        from projects.agent.orchestrator.nodes.plan_execution import create_execution_plan
 
         plan = create_execution_plan("full_report", config_id=1)
 
@@ -35,7 +35,7 @@ class TestPlanExecution:
 
     def test_create_execution_plan_has_tasks(self):
         """Plano deve ter tasks para cada agente."""
-        from app.agent.orchestrator.nodes.plan_execution import create_execution_plan
+        from projects.agent.orchestrator.nodes.plan_execution import create_execution_plan
 
         plan = create_execution_plan("find_problems", config_id=1)
 
@@ -48,7 +48,7 @@ class TestPlanExecution:
 
     def test_create_execution_plan_timeout(self):
         """Plano deve ter timeout baseado nos agentes."""
-        from app.agent.orchestrator.nodes.plan_execution import create_execution_plan
+        from projects.agent.orchestrator.nodes.plan_execution import create_execution_plan
 
         plan = create_execution_plan("analyze_performance", config_id=1)
 
@@ -57,7 +57,7 @@ class TestPlanExecution:
 
     def test_plan_execution_sets_required_agents(self):
         """plan_execution deve retornar required_agents."""
-        from app.agent.orchestrator.nodes.plan_execution import plan_execution
+        from projects.agent.orchestrator.nodes.plan_execution import plan_execution
 
         state = {
             "user_intent": "find_problems",

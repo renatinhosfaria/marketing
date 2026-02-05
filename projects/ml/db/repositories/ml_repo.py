@@ -82,7 +82,7 @@ class MLRepository:
         query = select(MLTrainedModel).where(
             and_(
                 MLTrainedModel.model_type == model_type,
-                MLTrainedModel.is_active == True,
+                MLTrainedModel.is_active.is_(True),
                 MLTrainedModel.status == ModelStatus.ACTIVE,
             )
         )
@@ -123,7 +123,7 @@ class MLRepository:
             .where(
                 and_(
                     MLTrainedModel.model_type == model_type,
-                    MLTrainedModel.is_active == True,
+                    MLTrainedModel.is_active.is_(True),
                 )
             )
             .values(is_active=False)
@@ -282,6 +282,18 @@ class MLRepository:
             )
             .order_by(desc(MLClassification.classified_at))
             .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_classification_by_id(
+        self,
+        classification_id: int,
+    ) -> Optional[MLClassification]:
+        """Obtém classificação por ID."""
+        result = await self.session.execute(
+            select(MLClassification).where(
+                MLClassification.id == classification_id
+            )
         )
         return result.scalar_one_or_none()
 
@@ -507,8 +519,8 @@ class MLRepository:
             if status == "active":
                 query = query.where(
                     and_(
-                        MLRecommendation.is_active == True,
-                        MLRecommendation.dismissed == False,
+                        MLRecommendation.is_active.is_(True),
+                        MLRecommendation.dismissed.is_(False),
                         or_(
                             MLRecommendation.expires_at.is_(None),
                             MLRecommendation.expires_at > now,
@@ -518,21 +530,21 @@ class MLRepository:
             elif status == "expired":
                 query = query.where(
                     and_(
-                        MLRecommendation.dismissed == False,
-                        MLRecommendation.was_applied == False,
+                        MLRecommendation.dismissed.is_(False),
+                        MLRecommendation.was_applied.is_(False),
                         MLRecommendation.expires_at.is_not(None),
                         MLRecommendation.expires_at <= now,
                     )
                 )
             elif status == "dismissed":
-                query = query.where(MLRecommendation.dismissed == True)
+                query = query.where(MLRecommendation.dismissed.is_(True))
             elif status == "applied":
-                query = query.where(MLRecommendation.was_applied == True)
+                query = query.where(MLRecommendation.was_applied.is_(True))
         elif active_only:
             query = query.where(
                 and_(
-                    MLRecommendation.is_active == True,
-                    MLRecommendation.dismissed == False,
+                    MLRecommendation.is_active.is_(True),
+                    MLRecommendation.dismissed.is_(False),
                     or_(
                         MLRecommendation.expires_at.is_(None),
                         MLRecommendation.expires_at > now,
@@ -592,8 +604,8 @@ class MLRepository:
             if status == "active":
                 query = query.where(
                     and_(
-                        MLRecommendation.is_active == True,
-                        MLRecommendation.dismissed == False,
+                        MLRecommendation.is_active.is_(True),
+                        MLRecommendation.dismissed.is_(False),
                         or_(
                             MLRecommendation.expires_at.is_(None),
                             MLRecommendation.expires_at > now,
@@ -603,16 +615,16 @@ class MLRepository:
             elif status == "expired":
                 query = query.where(
                     and_(
-                        MLRecommendation.dismissed == False,
-                        MLRecommendation.was_applied == False,
+                        MLRecommendation.dismissed.is_(False),
+                        MLRecommendation.was_applied.is_(False),
                         MLRecommendation.expires_at.is_not(None),
                         MLRecommendation.expires_at <= now,
                     )
                 )
             elif status == "dismissed":
-                query = query.where(MLRecommendation.dismissed == True)
+                query = query.where(MLRecommendation.dismissed.is_(True))
             elif status == "applied":
-                query = query.where(MLRecommendation.was_applied == True)
+                query = query.where(MLRecommendation.was_applied.is_(True))
         elif is_active is not None:
             query = query.where(MLRecommendation.is_active == is_active)
 
@@ -631,8 +643,8 @@ class MLRepository:
         query = select(MLRecommendation).where(
             and_(
                 MLRecommendation.config_id == config_id,
-                MLRecommendation.is_active == True,
-                MLRecommendation.dismissed == False,
+                MLRecommendation.is_active.is_(True),
+                MLRecommendation.dismissed.is_(False),
                 or_(
                     MLRecommendation.expires_at.is_(None),
                     MLRecommendation.expires_at > datetime.utcnow(),
@@ -688,9 +700,9 @@ class MLRepository:
         now = datetime.utcnow()
         conditions = [
             MLRecommendation.config_id == config_id,
-            MLRecommendation.is_active == True,
-            MLRecommendation.dismissed == False,
-            MLRecommendation.was_applied == False,
+            MLRecommendation.is_active.is_(True),
+            MLRecommendation.dismissed.is_(False),
+            MLRecommendation.was_applied.is_(False),
             MLRecommendation.expires_at.is_not(None),
             MLRecommendation.expires_at <= now,
         ]

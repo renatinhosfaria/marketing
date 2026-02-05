@@ -3,13 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { BarChart3, Brain, Bot, LogOut, Menu, X } from "lucide-react";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { BarChart3, Brain, Bot, Menu, X } from "lucide-react";
 
 const navItems = [
   { href: "/app/facebook-ads", label: "Facebook Ads", icon: BarChart3 },
@@ -17,17 +16,9 @@ const navItems = [
   { href: "/app/ai-agent", label: "Agente IA", icon: Bot },
 ];
 
-function getInitials(name: string): string {
-  if (!name) return "";
-  const parts = name.split(" ");
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
 export function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
-  const { user, logout } = useAuth();
 
   return (
     <TooltipProvider>
@@ -61,7 +52,7 @@ export function Sidebar() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
             <BarChart3 className="h-4 w-4 text-primary-foreground" />
           </div>
-          <span className="text-lg font-semibold">FamaChat ML</span>
+          <span className="text-lg font-semibold">Marketing</span>
         </div>
 
         <Separator />
@@ -96,21 +87,13 @@ export function Sidebar() {
           <div className="flex items-center gap-3 rounded-lg px-3 py-2">
             <Avatar className="h-8 w-8">
               <AvatarFallback className="text-xs">
-                {user ? getInitials(user.fullName) : "?"}
+                AD
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{user?.fullName}</p>
-              <p className="text-xs text-muted-foreground truncate">{user?.role}</p>
+              <p className="text-sm font-medium truncate">Administrador</p>
+              <p className="text-xs text-muted-foreground truncate">Gestor</p>
             </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={logout}>
-                  <LogOut className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Sair</TooltipContent>
-            </Tooltip>
           </div>
         </div>
       </aside>

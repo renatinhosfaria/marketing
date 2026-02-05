@@ -12,26 +12,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   DollarSign,
-  Eye,
   Image,
   Layers,
   Link as LinkIcon,
   Megaphone,
+  MousePointerClick,
   Settings,
   Target,
   TrendingUp,
-  Brain,
-  Lightbulb,
-  AlertTriangle,
+  Users,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import {
-  useClassificationSummary,
-  useRecommendationSummary,
-  useAnomalySummary,
-} from "@/hooks/use-ml";
 import {
   AdSetTable,
   AdTable,
@@ -78,6 +70,7 @@ export default function FacebookAdsDashboard() {
         "last_90d",
         "this_month",
         "this_year",
+        "last_year",
       ].includes(datePreset)
     ) {
       return "both";
@@ -131,15 +124,6 @@ export default function FacebookAdsDashboard() {
     datePreset,
     insightsTable,
   });
-
-  // Buscar dados ML
-  const { data: classificationSummary } = useClassificationSummary(
-    activeConfig?.id,
-  );
-  const { data: recommendationSummary } = useRecommendationSummary(
-    activeConfig?.id,
-  );
-  const { data: anomalySummary } = useAnomalySummary(activeConfig?.id, 7);
 
   // Loading geral
   const isLoading = configsLoading || summaryLoading;
@@ -256,7 +240,7 @@ export default function FacebookAdsDashboard() {
         {activeConfig && <SyncStatusBar configId={activeConfig.id} />}
 
         {/* KPIs */}
-        <KPIGrid columns={4}>
+        <KPIGrid columns={5}>
           <KPICard
             title="Gasto Total"
             value={summary?.totalSpend || 0}
@@ -265,16 +249,6 @@ export default function FacebookAdsDashboard() {
             iconColor="text-blue-500"
             format="currency"
             tooltip="Total investido no periodo selecionado"
-            isLoading={isLoading}
-          />
-          <KPICard
-            title="Alcance"
-            value={summary?.totalReach || 0}
-            change={summary?.comparison?.impressionsChange}
-            icon={Eye}
-            iconColor="text-purple-500"
-            format="number"
-            tooltip="Numero de pessoas unicas que viram seus anuncios"
             isLoading={isLoading}
           />
           <KPICard
@@ -288,149 +262,36 @@ export default function FacebookAdsDashboard() {
             isLoading={isLoading}
           />
           <KPICard
-            title="CPL (Custo por Lead)"
+            title="CPL"
             value={summary?.avgCpl || 0}
             change={summary?.comparison?.cplChange}
-            icon={TrendingUp}
+            icon={Users}
             iconColor="text-orange-500"
             format="currency"
-            tooltip="Custo medio por lead gerado"
+            tooltip="Custo por Lead - valor medio gasto para gerar cada lead"
+            isLoading={isLoading}
+          />
+          <KPICard
+            title="CPM"
+            value={summary?.avgCpm || 0}
+            change={summary?.comparison?.cpmChange}
+            icon={TrendingUp}
+            iconColor="text-purple-500"
+            format="currency"
+            tooltip="Custo por Mil Impressoes - valor gasto a cada 1000 exibicoes do anuncio"
+            isLoading={isLoading}
+          />
+          <KPICard
+            title="CPC"
+            value={summary?.avgCpc || 0}
+            change={summary?.comparison?.cpcChange}
+            icon={MousePointerClick}
+            iconColor="text-cyan-500"
+            format="currency"
+            tooltip="Custo por Clique - valor medio gasto por cada clique"
             isLoading={isLoading}
           />
         </KPIGrid>
-
-        {/* ML Insights */}
-        {activeConfig &&
-          (classificationSummary ||
-            recommendationSummary ||
-            anomalySummary) && (
-            <div className="grid gap-4 md:grid-cols-3">
-              {/* Classificacoes */}
-              <div className="rounded-lg border bg-card p-4 shadow-sm">
-                <div className="mb-3 flex items-center gap-2">
-                  <Brain className="h-5 w-5 text-indigo-500" />
-                  <h3 className="font-semibold">Classificacao ML</h3>
-                </div>
-                {classificationSummary ? (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        Alto Desempenho
-                      </span>
-                      <span className="font-medium text-green-600">
-                        {classificationSummary.by_tier?.HIGH_PERFORMER || 0}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Moderado</span>
-                      <span className="font-medium text-yellow-600">
-                        {classificationSummary.by_tier?.MODERATE || 0}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        Baixo/Underperformer
-                      </span>
-                      <span className="font-medium text-red-600">
-                        {(classificationSummary.by_tier?.LOW || 0) +
-                          (classificationSummary.by_tier?.UNDERPERFORMER || 0)}
-                      </span>
-                    </div>
-                    <div className="border-t pt-2">
-                      <span className="text-xs text-muted-foreground">
-                        {classificationSummary.total_campaigns || 0} campanhas
-                        classificadas
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Sem dados de classificacao
-                  </p>
-                )}
-              </div>
-
-              {/* Recomendacoes */}
-              <div className="rounded-lg border bg-card p-4 shadow-sm">
-                <div className="mb-3 flex items-center gap-2">
-                  <Lightbulb className="h-5 w-5 text-amber-500" />
-                  <h3 className="font-semibold">Recomendacoes</h3>
-                </div>
-                {recommendationSummary ? (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Total</span>
-                      <span className="font-medium">
-                        {recommendationSummary.total || 0}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        Alta Prioridade
-                      </span>
-                      <span className="font-medium text-red-600">
-                        {recommendationSummary.high_priority_count || 0}
-                      </span>
-                    </div>
-                    <Link
-                      href="/app/ml"
-                      className="block border-t pt-2 text-xs text-indigo-600 hover:underline"
-                    >
-                      Ver todas recomendacoes →
-                    </Link>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Sem recomendacoes
-                  </p>
-                )}
-              </div>
-
-              {/* Anomalias */}
-              <div className="rounded-lg border bg-card p-4 shadow-sm">
-                <div className="mb-3 flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-red-500" />
-                  <h3 className="font-semibold">Anomalias (7 dias)</h3>
-                </div>
-                {anomalySummary ? (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        Total Detectadas
-                      </span>
-                      <span className="font-medium">
-                        {anomalySummary.total || 0}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Criticas</span>
-                      <span className="font-medium text-red-600">
-                        {anomalySummary.by_severity?.CRITICAL || 0}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        Nao Reconhecidas
-                      </span>
-                      <span className="font-medium text-amber-600">
-                        {anomalySummary.unacknowledged || 0}
-                      </span>
-                    </div>
-                    <Link
-                      href="/app/ml"
-                      className="block border-t pt-2 text-xs text-indigo-600 hover:underline"
-                    >
-                      Ver detalhes →
-                    </Link>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Sem anomalias detectadas
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
 
         {/* Sistema de Abas */}
         <Tabs

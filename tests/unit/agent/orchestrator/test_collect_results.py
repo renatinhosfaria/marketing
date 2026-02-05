@@ -7,13 +7,13 @@ class TestCollectResults:
 
     def test_collect_results_import(self):
         """collect_results deve ser importavel."""
-        from app.agent.orchestrator.nodes.collect_results import collect_results
+        from projects.agent.orchestrator.nodes.collect_results import collect_results
         assert collect_results is not None
 
     def test_collect_results_aggregates(self):
         """collect_results deve agregar resultados de subagentes."""
-        from app.agent.orchestrator.nodes.collect_results import collect_results
-        from app.agent.orchestrator.state import create_initial_orchestrator_state
+        from projects.agent.orchestrator.nodes.collect_results import collect_results
+        from projects.agent.orchestrator.state import create_initial_orchestrator_state
 
         state = create_initial_orchestrator_state(
             config_id=1,
@@ -37,7 +37,7 @@ class TestCollectResults:
 
     def test_merge_subagent_results(self):
         """merge_subagent_results deve combinar multiplos resultados."""
-        from app.agent.orchestrator.nodes.collect_results import merge_subagent_results
+        from projects.agent.orchestrator.nodes.collect_results import merge_subagent_results
 
         existing = {
             "classification": {"success": True, "data": {"a": 1}}
@@ -53,7 +53,7 @@ class TestCollectResults:
 
     def test_calculate_confidence_score(self):
         """calculate_confidence_score deve calcular score corretamente."""
-        from app.agent.orchestrator.nodes.collect_results import calculate_confidence_score
+        from projects.agent.orchestrator.nodes.collect_results import calculate_confidence_score
 
         # Todos sucesso
         results = {
@@ -71,8 +71,8 @@ class TestCollectResults:
 
     def test_collect_results_empty(self):
         """collect_results deve funcionar sem resultados."""
-        from app.agent.orchestrator.nodes.collect_results import collect_results
-        from app.agent.orchestrator.state import create_initial_orchestrator_state
+        from projects.agent.orchestrator.nodes.collect_results import collect_results
+        from projects.agent.orchestrator.state import create_initial_orchestrator_state
 
         state = create_initial_orchestrator_state(
             config_id=1,

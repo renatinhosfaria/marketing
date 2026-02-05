@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.4
-# FamaChat ML Frontend - Next.js 16
+# Marketing Frontend - Next.js
 # Multi-stage build otimizado com standalone output
 
 # ==================== DEPS STAGE ====================
@@ -27,12 +27,14 @@ COPY . .
 
 # Build args para variaveis de ambiente em build time
 ARG NEXT_PUBLIC_API_URL=""
-ARG NEXT_PUBLIC_APP_NAME="FamaChat ML"
+ARG NEXT_PUBLIC_APP_NAME="Marketing"
 ARG NEXT_PUBLIC_FACEBOOK_APP_ID=""
+ARG API_INTERNAL_URL="http://marketing-api:8000"
 
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME}
 ENV NEXT_PUBLIC_FACEBOOK_APP_ID=${NEXT_PUBLIC_FACEBOOK_APP_ID}
+ENV API_INTERNAL_URL=${API_INTERNAL_URL}
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Build de producao (standalone)
@@ -41,8 +43,8 @@ RUN npm run build
 # ==================== PRODUCTION STAGE ====================
 FROM node:20-alpine AS production
 
-LABEL maintainer="FamaChat Team"
-LABEL description="Frontend Next.js para FamaChat ML"
+LABEL maintainer="Marketing Team"
+LABEL description="Frontend Next.js para Marketing"
 
 WORKDIR /app
 

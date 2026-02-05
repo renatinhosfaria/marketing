@@ -23,7 +23,7 @@ import importlib.util
 schemas_path = os.path.join(
     os.path.dirname(__file__),
     '..', '..', '..',
-    'app', 'api', 'v1', 'agent', 'schemas.py'
+    'projects', 'agent', 'api', 'schemas.py'
 )
 schemas_path = os.path.abspath(schemas_path)
 
@@ -516,7 +516,7 @@ class TestSubagentRegistry:
         subagents_init_path = os.path.join(
             os.path.dirname(__file__),
             '..', '..', '..',
-            'app', 'agent', 'subagents', '__init__.py'
+            'projects', 'agent', 'subagents', '__init__.py'
         )
         subagents_init_path = os.path.abspath(subagents_init_path)
 

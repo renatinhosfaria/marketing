@@ -30,6 +30,7 @@ const presetOptions: { value: DatePreset; label: string }[] = [
   { value: "this_month", label: "Este mes" },
   { value: "last_month", label: "Mes passado" },
   { value: "this_year", label: "Este ano" },
+  { value: "last_year", label: "Ultimo ano" },
 ];
 
 export function DatePresetSelector({
@@ -142,6 +143,12 @@ export function getDateRangeFromPreset(preset: DatePreset): {
 
     case "this_year":
       start = new Date(now.getFullYear(), 0, 1);
+      break;
+
+    case "last_year":
+      start = new Date(now.getFullYear() - 1, 0, 1);
+      end.setFullYear(now.getFullYear() - 1, 11, 31);
+      end.setHours(23, 59, 59, 999);
       break;
 
     default:

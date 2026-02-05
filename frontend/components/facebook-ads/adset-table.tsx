@@ -34,7 +34,7 @@ interface AdSetTableProps {
   statusFilter?: string | null;
 }
 
-type SortField = "name" | "status" | "spend" | "leads" | "cpl" | "ctr";
+type SortField = "name" | "status" | "spend" | "leads" | "cpm" | "cpc" | "cpl" | "ctr";
 type SortOrder = "asc" | "desc";
 
 export function AdSetTable({
@@ -73,6 +73,14 @@ export function AdSetTable({
       case "leads":
         valueA = a.leads;
         valueB = b.leads;
+        break;
+      case "cpm":
+        valueA = a.cpm;
+        valueB = b.cpm;
+        break;
+      case "cpc":
+        valueA = a.cpc;
+        valueB = b.cpc;
         break;
       case "cpl":
         valueA = a.cpl ?? Infinity;
@@ -156,7 +164,7 @@ export function AdSetTable({
           <Table>
             <TableHeader>
               <TableRow>
-                {["Nome", "Status", "Gasto", "Leads", "CPL", "CTR"].map(
+                {["Nome", "Status", "Gasto", "Leads", "CPM", "CPC", "CPL", "CTR"].map(
                   (_, i) => (
                     <TableHead key={i}>
                       <Skeleton className="h-4 w-20" />
@@ -168,7 +176,7 @@ export function AdSetTable({
             <TableBody>
               {[...Array(5)].map((_, i) => (
                 <TableRow key={i}>
-                  {[...Array(6)].map((_, j) => (
+                  {[...Array(8)].map((_, j) => (
                     <TableCell key={j}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
@@ -257,6 +265,24 @@ export function AdSetTable({
               </TableHead>
               <TableHead
                 className="cursor-pointer text-right hover:bg-muted/50"
+                onClick={() => handleSort("cpm")}
+              >
+                <div className="flex items-center justify-end">
+                  CPM
+                  <SortIcon field="cpm" />
+                </div>
+              </TableHead>
+              <TableHead
+                className="cursor-pointer text-right hover:bg-muted/50"
+                onClick={() => handleSort("cpc")}
+              >
+                <div className="flex items-center justify-end">
+                  CPC
+                  <SortIcon field="cpc" />
+                </div>
+              </TableHead>
+              <TableHead
+                className="cursor-pointer text-right hover:bg-muted/50"
                 onClick={() => handleSort("cpl")}
               >
                 <div className="flex items-center justify-end">
@@ -278,7 +304,7 @@ export function AdSetTable({
           <TableBody>
             {sortedAdSets.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
+                <TableCell colSpan={8} className="h-24 text-center">
                   {search
                     ? "Nenhum conjunto encontrado para a busca."
                     : "Nenhum conjunto de anuncios disponivel."}
@@ -298,6 +324,12 @@ export function AdSetTable({
                   </TableCell>
                   <TableCell className="text-right">
                     {formatNumber(adSet.leads)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {formatCurrency(adSet.cpm)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {formatCurrency(adSet.cpc)}
                   </TableCell>
                   <TableCell className="text-right">
                     {adSet.cpl ? formatCurrency(adSet.cpl) : "\u2014"}

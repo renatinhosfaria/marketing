@@ -26,7 +26,7 @@ class TestMultiAgentIntegration:
     @pytest.mark.asyncio
     async def test_orchestrator_full_flow(self, mock_llm):
         """Testa fluxo completo do orchestrator."""
-        from app.agent.orchestrator import (
+        from projects.agent.orchestrator import (
             create_initial_orchestrator_state,
             get_orchestrator,
             reset_orchestrator
@@ -52,7 +52,7 @@ class TestMultiAgentIntegration:
     @pytest.mark.asyncio
     async def test_subagent_standalone_execution(self, mock_llm):
         """Testa execucao standalone de subagente."""
-        from app.agent.subagents import ClassificationAgent
+        from projects.agent.subagents import ClassificationAgent
 
         with patch('app.agent.llm.provider.get_llm_with_tools', return_value=mock_llm):
             agent = ClassificationAgent()
@@ -63,7 +63,7 @@ class TestMultiAgentIntegration:
 
     def test_all_subagents_instantiate(self):
         """Todos os subagentes devem instanciar sem erro."""
-        from app.agent.subagents import get_all_subagents
+        from projects.agent.subagents import get_all_subagents
 
         agents = get_all_subagents()
 
@@ -76,7 +76,7 @@ class TestMultiAgentIntegration:
 
     def test_intent_detection_coverage(self):
         """Deteccao de intencao deve cobrir casos principais."""
-        from app.agent.orchestrator.nodes import detect_intent
+        from projects.agent.orchestrator.nodes import detect_intent
 
         test_cases = [
             ("Como esta minha performance?", "analyze_performance"),
@@ -94,7 +94,7 @@ class TestMultiAgentIntegration:
 
     def test_execution_plan_creation(self):
         """Planos de execucao devem ser criados corretamente."""
-        from app.agent.orchestrator.nodes import create_execution_plan
+        from projects.agent.orchestrator.nodes import create_execution_plan
 
         plan = create_execution_plan("full_report", config_id=1)
 
@@ -116,7 +116,7 @@ class TestMultiAgentRealExecution:
     @pytest.mark.asyncio
     async def test_real_chat_flow(self):
         """Testa fluxo de chat real."""
-        from app.agent.service import TrafficAgentService
+        from projects.agent.service import TrafficAgentService
 
         service = TrafficAgentService()
         await service.initialize()

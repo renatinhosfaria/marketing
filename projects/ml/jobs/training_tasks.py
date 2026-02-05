@@ -142,6 +142,8 @@ def train_campaign_classifier(config_id: int):
 @celery_app.task(
     name="projects.ml.jobs.training_tasks.train_anomaly_detector",
     max_retries=2,
+    soft_time_limit=1800,  # 30 minutes soft limit
+    time_limit=2400,       # 40 minutes hard limit
 )
 def train_anomaly_detector(config_id: int):
     """Treina detector de anomalias Isolation Forest para uma config."""
@@ -182,6 +184,8 @@ def train_anomaly_detector(config_id: int):
 @celery_app.task(
     name="projects.ml.jobs.training_tasks.train_anomaly_detectors_all",
     max_retries=1,
+    soft_time_limit=300,  # 5 minutes soft limit (just dispatches tasks)
+    time_limit=600,       # 10 minutes hard limit
 )
 def train_anomaly_detectors_all():
     """
@@ -292,7 +296,6 @@ async def _train_isolation_forest_for_config(config_id: int, session_maker) -> d
     """
     from projects.ml.db.repositories.insights_repo import InsightsRepository
     from shared.config import settings
-    from datetime import datetime
 
     results = {
         "config_id": config_id,

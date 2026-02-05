@@ -41,7 +41,7 @@ interface CampaignTableProps {
   statusFilter?: string | null;
 }
 
-type SortField = "name" | "status" | "spend" | "leads" | "cpl" | "ctr";
+type SortField = "name" | "status" | "spend" | "leads" | "cpm" | "cpc" | "cpl" | "ctr";
 type SortOrder = "asc" | "desc";
 
 export function CampaignTable({
@@ -81,6 +81,14 @@ export function CampaignTable({
       case "leads":
         valueA = a.leads;
         valueB = b.leads;
+        break;
+      case "cpm":
+        valueA = a.cpm;
+        valueB = b.cpm;
+        break;
+      case "cpc":
+        valueA = a.cpc;
+        valueB = b.cpc;
         break;
       case "cpl":
         valueA = a.cpl ?? Infinity;
@@ -164,7 +172,7 @@ export function CampaignTable({
           <Table>
             <TableHeader>
               <TableRow>
-                {["Nome", "Status", "Gasto", "Leads", "CPL", "CTR", ""].map(
+                {["Nome", "Status", "Gasto", "Leads", "CPM", "CPC", "CPL", "CTR", ""].map(
                   (_, i) => (
                     <TableHead key={i}>
                       <Skeleton className="h-4 w-20" />
@@ -176,7 +184,7 @@ export function CampaignTable({
             <TableBody>
               {[...Array(5)].map((_, i) => (
                 <TableRow key={i}>
-                  {[...Array(7)].map((_, j) => (
+                  {[...Array(9)].map((_, j) => (
                     <TableCell key={j}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
@@ -265,6 +273,24 @@ export function CampaignTable({
               </TableHead>
               <TableHead
                 className="cursor-pointer text-right hover:bg-muted/50"
+                onClick={() => handleSort("cpm")}
+              >
+                <div className="flex items-center justify-end">
+                  CPM
+                  <SortIcon field="cpm" />
+                </div>
+              </TableHead>
+              <TableHead
+                className="cursor-pointer text-right hover:bg-muted/50"
+                onClick={() => handleSort("cpc")}
+              >
+                <div className="flex items-center justify-end">
+                  CPC
+                  <SortIcon field="cpc" />
+                </div>
+              </TableHead>
+              <TableHead
+                className="cursor-pointer text-right hover:bg-muted/50"
                 onClick={() => handleSort("cpl")}
               >
                 <div className="flex items-center justify-end">
@@ -287,7 +313,7 @@ export function CampaignTable({
           <TableBody>
             {sortedCampaigns.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center">
+                <TableCell colSpan={9} className="h-24 text-center">
                   {search
                     ? "Nenhuma campanha encontrada para a busca."
                     : "Nenhuma campanha disponivel."}
@@ -313,6 +339,12 @@ export function CampaignTable({
                   </TableCell>
                   <TableCell className="text-right">
                     {formatNumber(campaign.leads)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {formatCurrency(campaign.cpm)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {formatCurrency(campaign.cpc)}
                   </TableCell>
                   <TableCell className="text-right">
                     {campaign.cpl ? formatCurrency(campaign.cpl) : "\u2014"}

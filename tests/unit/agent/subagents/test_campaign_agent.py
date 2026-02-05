@@ -21,7 +21,7 @@ if root_path not in sys.path:
 state_path = os.path.join(
     os.path.dirname(__file__),
     '..', '..', '..', '..',
-    'app', 'agent', 'subagents', 'state.py'
+    'projects', 'agent', 'subagents', 'state.py'
 )
 state_path = os.path.abspath(state_path)
 
@@ -81,8 +81,8 @@ def _create_mock_campaign_tools():
 def _setup_mock_modules():
     """Configura modulos mock necessarios."""
     # Criar pacotes necessarios
-    if 'app' not in sys.modules:
-        sys.modules['app'] = types.ModuleType('app')
+    if 'projects' not in sys.modules:
+        sys.modules['projects'] = types.ModuleType('projects')
     if 'app.agent' not in sys.modules:
         agent_mod = types.ModuleType('app.agent')
         sys.modules['app.agent'] = agent_mod
@@ -104,7 +104,7 @@ def load_base_module():
     _setup_mock_modules()
 
     base_path = os.path.join(
-        root_path, 'app', 'agent', 'subagents', 'base.py'
+        root_path, 'projects', 'agent', 'subagents', 'base.py'
     )
 
     if 'app.agent.subagents.base' in sys.modules:
@@ -128,7 +128,7 @@ def load_campaign_prompts_module():
     _setup_mock_modules()
 
     prompts_path = os.path.join(
-        root_path, 'app', 'agent', 'subagents', 'campaign', 'prompts.py'
+        root_path, 'projects', 'agent', 'subagents', 'campaign', 'prompts.py'
     )
 
     if 'app.agent.subagents.campaign.prompts' in sys.modules:
@@ -161,7 +161,7 @@ def load_campaign_agent_module():
     load_campaign_prompts_module()
 
     agent_path = os.path.join(
-        root_path, 'app', 'agent', 'subagents', 'campaign', 'agent.py'
+        root_path, 'projects', 'agent', 'subagents', 'campaign', 'agent.py'
     )
 
     if 'app.agent.subagents.campaign.agent' in sys.modules:
@@ -190,7 +190,7 @@ def load_campaign_init_module():
     load_campaign_agent_module()
 
     init_path = os.path.join(
-        root_path, 'app', 'agent', 'subagents', 'campaign', '__init__.py'
+        root_path, 'projects', 'agent', 'subagents', 'campaign', '__init__.py'
     )
 
     # Recarregar para testar exports

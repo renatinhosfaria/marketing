@@ -42,7 +42,6 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { useAuth } from "@/hooks/use-auth";
 import {
   AlertCircle,
   ArrowLeft,
@@ -79,8 +78,6 @@ const FB_ADS_API = "/api/v1/facebook-ads";
 export default function FacebookAdsSettings() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
-
   // State
   const [showConnectDialog, setShowConnectDialog] = useState(false);
   const [selectedConfig, setSelectedConfig] = useState<FacebookConfig | null>(
@@ -231,7 +228,7 @@ export default function FacebookAdsSettings() {
     const state = btoa(
       JSON.stringify({
         timestamp: Date.now(),
-        userId: user?.id || 1,
+        userId: 1,
       }),
     );
     localStorage.setItem("fb_oauth_state", state);

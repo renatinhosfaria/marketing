@@ -134,24 +134,24 @@ def _load_module_directly(module_name: str, file_path: str):
 
 
 # Carregar state
-state_path = os.path.join(root_path, 'app', 'agent', 'subagents', 'state.py')
+state_path = os.path.join(root_path, 'projects', 'agent', 'subagents', 'state.py')
 subagent_state = _load_module_directly('app.agent.subagents.state', state_path)
 
 # Carregar base
-base_path = os.path.join(root_path, 'app', 'agent', 'subagents', 'base.py')
+base_path = os.path.join(root_path, 'projects', 'agent', 'subagents', 'base.py')
 subagent_base = _load_module_directly('app.agent.subagents.base', base_path)
 
 # Carregar prompts de cada agente
 for agent_name in ['classification', 'anomaly', 'forecast', 'recommendation', 'campaign', 'analysis']:
-    prompts_path = os.path.join(root_path, 'app', 'agent', 'subagents', agent_name, 'prompts.py')
+    prompts_path = os.path.join(root_path, 'projects', 'agent', 'subagents', agent_name, 'prompts.py')
     _load_module_directly(f'app.agent.subagents.{agent_name}.prompts', prompts_path)
-    agent_path = os.path.join(root_path, 'app', 'agent', 'subagents', agent_name, 'agent.py')
+    agent_path = os.path.join(root_path, 'projects', 'agent', 'subagents', agent_name, 'agent.py')
     _load_module_directly(f'app.agent.subagents.{agent_name}.agent', agent_path)
 
 _restore_mocked_modules()
 
 # Agora carregamos o __init__ que contém o registry
-init_path = os.path.join(root_path, 'app', 'agent', 'subagents', '__init__.py')
+init_path = os.path.join(root_path, 'projects', 'agent', 'subagents', '__init__.py')
 subagents_module = _load_module_directly('app.agent.subagents', init_path)
 _cleanup_loaded_subagent_modules()
 
