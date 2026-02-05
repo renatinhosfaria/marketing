@@ -95,6 +95,13 @@ celery_app.conf.update(
             "options": {"queue": "ml"},
         },
 
+        # Treinar XGBoost classifiers diariamente às 03:00
+        "daily-classifier-training": {
+            "task": "projects.ml.jobs.training_tasks.train_classifiers_all",
+            "schedule": crontab(hour=3, minute=0),
+            "options": {"queue": "training"},
+        },
+
         # Treinar Isolation Forest diariamente às 04:00
         "daily-anomaly-detector-training": {
             "task": "projects.ml.jobs.training_tasks.train_anomaly_detectors_all",
