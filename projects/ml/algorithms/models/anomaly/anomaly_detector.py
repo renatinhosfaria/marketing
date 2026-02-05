@@ -369,17 +369,19 @@ class AnomalyDetector:
         df: pd.DataFrame,
         entity_type: str,
         entity_id: str,
+        config_id: Optional[int] = None,
         analysis_date: Optional[datetime] = None,
     ) -> list[DetectedAnomaly]:
         """
         Detecta anomalias em um DataFrame de métricas diárias.
-        
+
         Args:
             df: DataFrame com colunas: date, spend, impressions, clicks, leads, etc.
             entity_type: Tipo da entidade (campaign, adset, ad)
             entity_id: ID da entidade
+            config_id: ID da config (necessário para carregar modelo IF)
             analysis_date: Data para análise (padrão: última data no df)
-            
+
         Returns:
             Lista de anomalias detectadas
         """
@@ -505,15 +507,17 @@ class AnomalyDetector:
         )
         anomalies.extend(change_anomalies)
 
-        # 7. Detecção multivariada com Isolation Forest (se treinado)
-        if self.use_isolation_forest and self.isolation_forest_model is not None:
-            multivariate_anomalies = self._detect_multivariate_anomalies(
-                df_analysis,
-                entity_type,
-                entity_id,
-                analysis_date
-            )
-            anomalies.extend(multivariate_anomalies)
+        # 7. Detecção multivariada com Isolation Forest (se habilitado e modelo disponível)
+        if self.use_isolation_forest and config_id is not None:
+            # Try to load model for this entity
+            if self.load_model(config_id, entity_type, entity_id):
+                multivariate_anomalies = self._detect_multivariate_anomalies(
+                    df_analysis,
+                    entity_type,
+                    entity_id,
+                    analysis_date
+                )
+                anomalies.extend(multivariate_anomalies)
 
         logger.info(
             "Detecção de anomalias concluída",
