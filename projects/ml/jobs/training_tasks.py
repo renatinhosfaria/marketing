@@ -390,17 +390,20 @@ async def _train_isolation_forest_for_entity(
     session_maker,
 ) -> dict:
     """
-    Train Isolation Forest for a single entity.
+    Train Isolation Forest for a single entity with DB persistence.
 
     Returns:
-        Dict with training result
+        Dict with training result including model_id if persisted to database
     """
     from projects.ml.services.data_service import DataService
+    from projects.ml.db.repositories.ml_repo import MLRepository
     from projects.ml.algorithms.models.anomaly.anomaly_detector import AnomalyDetector
+    from projects.ml.db.models import ModelType, ModelStatus
     from shared.config import settings
 
     async with session_maker() as session:
         data_service = DataService(session)
+        ml_repo = MLRepository(session)
 
         # Get historical data
         df = await data_service.get_entity_daily_data(
@@ -430,11 +433,48 @@ async def _train_isolation_forest_for_entity(
                 "reason": "training_failed",
             }
 
-        # Save model
+        # Save model to filesystem
+        model_path = detector.get_model_path(config_id, entity_type, entity_id)
         saved = detector.save_model(config_id, entity_type, entity_id)
 
+        if not saved:
+            return {
+                "status": "failed",
+                "reason": "save_failed",
+            }
+
+        # Persist model metadata to database
+        model_record = await ml_repo.create_model(
+            name=f"isolation_forest_{entity_type}_{entity_id}",
+            model_type=ModelType.ANOMALY_DETECTOR,
+            version="1.0.0",
+            config_id=config_id,
+            model_path=str(model_path),
+            parameters={
+                'contamination': settings.isolation_forest_contamination,
+                'n_estimators': 100,
+                'entity_type': entity_type,
+                'entity_id': entity_id,
+            },
+            feature_columns=detector.isolation_forest_features,
+        )
+
+        # Update status to READY with training metrics
+        await ml_repo.update_model_status(
+            model_record.id,
+            ModelStatus.READY,
+            training_metrics={
+                'samples': len(df),
+                'features_used': detector.isolation_forest_features,
+                'contamination': settings.isolation_forest_contamination,
+            },
+        )
+
+        await session.commit()
+
         return {
-            "status": "success" if saved else "save_failed",
+            "status": "success",
+            "model_id": model_record.id,
             "samples": len(df),
             "features": detector.isolation_forest_features,
         }
