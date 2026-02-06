@@ -441,6 +441,11 @@ class RecommendationService:
 
             expires_at = datetime.utcnow() + timedelta(days=rec.expires_in_days)
 
+            # Obter nomes da entidade para identificação visual
+            entity_names = await self.data_service.get_entity_names(
+                rec.config_id, rec.entity_type, rec.entity_id
+            )
+
             saved = await self.ml_repo.create_recommendation(
                 config_id=rec.config_id,
                 entity_type=rec.entity_type,
@@ -452,9 +457,12 @@ class RecommendationService:
                 suggested_action=rec.suggested_action,
                 confidence_score=rec.confidence_score,
                 reasoning=rec.reasoning,
-                expires_at=expires_at
+                expires_at=expires_at,
+                campaign_name=entity_names.get('campaign_name'),
+                adset_name=entity_names.get('adset_name'),
+                ad_name=entity_names.get('ad_name'),
             )
-            
+
             return saved
         except Exception as e:
             logger.error(

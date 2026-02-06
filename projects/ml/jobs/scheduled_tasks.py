@@ -60,6 +60,9 @@ async def _run_compute_features_for_config(config_id: int, window_days: int = 30
                 campaign_id=campaign.campaign_id,
                 days=window_days,
             )
+            # O nome da campanha já está disponível no objeto campaign
+            campaign_name = campaign.name if hasattr(campaign, 'name') else None
+
             if features is None:
                 await ml_repo.create_feature(
                     config_id=config_id,
@@ -69,6 +72,7 @@ async def _run_compute_features_for_config(config_id: int, window_days: int = 30
                     feature_date=feature_date,
                     features=None,
                     insufficient_data=True,
+                    campaign_name=campaign_name,
                 )
                 insufficient += 1
             else:
@@ -80,6 +84,7 @@ async def _run_compute_features_for_config(config_id: int, window_days: int = 30
                     feature_date=feature_date,
                     features=_serialize_features(features),
                     insufficient_data=False,
+                    campaign_name=campaign_name,
                 )
                 inserted += 1
 
@@ -117,6 +122,9 @@ async def _run_forecasts_for_config(config_id: int, window_days: int = 30, sessi
         insufficient = 0
 
         for campaign in campaigns:
+            # O nome da campanha já está disponível no objeto campaign
+            campaign_name = campaign.name if hasattr(campaign, 'name') else None
+
             df = await data_service.get_campaign_daily_data(
                 config_id=config_id,
                 campaign_id=campaign.campaign_id,
@@ -144,6 +152,7 @@ async def _run_forecasts_for_config(config_id: int, window_days: int = 30, sessi
                         window_days=window_days,
                         model_version=forecaster.model_version,
                         insufficient_data=True,
+                        campaign_name=campaign_name,
                     )
                     insufficient += 1
                 continue
@@ -199,6 +208,7 @@ async def _run_forecasts_for_config(config_id: int, window_days: int = 30, sessi
                     window_days=window_days,
                     model_version=forecaster.model_version,
                     insufficient_data=False,
+                    campaign_name=campaign_name,
                 )
                 generated += 1
 

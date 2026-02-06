@@ -9,6 +9,7 @@ from projects.ml.api import classifications
 from projects.ml.api import recommendations
 from projects.ml.api import anomalies
 from projects.ml.api import models
+from projects.ml.api import impact
 
 __all__ = [
     "health",
@@ -18,4 +19,5 @@ __all__ = [
     "recommendations",
     "anomalies",
     "models",
+    "impact",
 ]

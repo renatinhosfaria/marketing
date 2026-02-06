@@ -149,6 +149,9 @@ class MLRepository:
         horizon_days: int = 1,
         confidence_lower: Optional[float] = None,
         confidence_upper: Optional[float] = None,
+        campaign_name: Optional[str] = None,
+        adset_name: Optional[str] = None,
+        ad_name: Optional[str] = None,
     ) -> MLPrediction:
         """Cria nova previsão."""
         prediction = MLPrediction(
@@ -156,6 +159,9 @@ class MLRepository:
             config_id=config_id,
             entity_type=entity_type,
             entity_id=entity_id,
+            campaign_name=campaign_name,
+            adset_name=adset_name,
+            ad_name=ad_name,
             prediction_type=prediction_type,
             forecast_date=forecast_date,
             predicted_value=predicted_value,
@@ -229,6 +235,9 @@ class MLRepository:
         feature_importances: Optional[dict] = None,
         previous_tier: Optional[CampaignTier] = None,
         model_version: Optional[str] = None,
+        campaign_name: Optional[str] = None,
+        adset_name: Optional[str] = None,
+        ad_name: Optional[str] = None,
     ) -> MLClassification:
         """Cria nova classificacao de entidade."""
         tier_change = "stable"
@@ -251,6 +260,9 @@ class MLRepository:
             entity_type=entity_type,
             entity_id=entity_id,
             parent_id=parent_id,
+            campaign_name=campaign_name,
+            adset_name=adset_name,
+            ad_name=ad_name,
             tier=tier,
             confidence_score=confidence_score,
             metrics_snapshot=metrics_snapshot,
@@ -449,12 +461,18 @@ class MLRepository:
         confidence_score: float = 0.5,
         reasoning: Optional[dict] = None,
         expires_at: Optional[datetime] = None,
+        campaign_name: Optional[str] = None,
+        adset_name: Optional[str] = None,
+        ad_name: Optional[str] = None,
     ) -> MLRecommendation:
         """Cria nova recomendação."""
         recommendation = MLRecommendation(
             config_id=config_id,
             entity_type=entity_type,
             entity_id=entity_id,
+            campaign_name=campaign_name,
+            adset_name=adset_name,
+            ad_name=ad_name,
             recommendation_type=recommendation_type,
             title=title,
             description=description,
@@ -768,12 +786,18 @@ class MLRepository:
         severity: AnomalySeverity,
         anomaly_date: datetime,
         recommendation_id: Optional[int] = None,
+        campaign_name: Optional[str] = None,
+        adset_name: Optional[str] = None,
+        ad_name: Optional[str] = None,
     ) -> MLAnomaly:
         """Cria registro de anomalia."""
         anomaly = MLAnomaly(
             config_id=config_id,
             entity_type=entity_type,
             entity_id=entity_id,
+            campaign_name=campaign_name,
+            adset_name=adset_name,
+            ad_name=ad_name,
             anomaly_type=anomaly_type,
             metric_name=metric_name,
             observed_value=observed_value,
@@ -917,6 +941,9 @@ class MLRepository:
         entity_type: str = "campaign",
         parent_id: Optional[str] = None,
         insufficient_data: bool = False,
+        campaign_name: Optional[str] = None,
+        adset_name: Optional[str] = None,
+        ad_name: Optional[str] = None,
     ) -> MLFeature:
         """Cria registro de features."""
         record = MLFeature(
@@ -924,6 +951,9 @@ class MLRepository:
             entity_type=entity_type,
             entity_id=entity_id,
             parent_id=parent_id,
+            campaign_name=campaign_name,
+            adset_name=adset_name,
+            ad_name=ad_name,
             window_days=window_days,
             feature_date=feature_date,
             features=features,
@@ -1000,12 +1030,18 @@ class MLRepository:
         window_days: Optional[int] = None,
         model_version: Optional[str] = None,
         insufficient_data: bool = False,
+        campaign_name: Optional[str] = None,
+        adset_name: Optional[str] = None,
+        ad_name: Optional[str] = None,
     ) -> MLForecast:
         """Cria registro de forecast."""
         record = MLForecast(
             config_id=config_id,
             entity_type=entity_type,
             entity_id=entity_id,
+            campaign_name=campaign_name,
+            adset_name=adset_name,
+            ad_name=ad_name,
             target_metric=target_metric,
             horizon_days=horizon_days,
             method=method,

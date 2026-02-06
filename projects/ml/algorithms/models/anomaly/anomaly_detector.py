@@ -38,16 +38,9 @@ logger = get_logger(__name__)
 # Special deviation score for zero spend anomalies (indicates complete stop)
 ZERO_SPEND_DEVIATION_SCORE: float = -999.0
 
-# Frequency thresholds for audience fatigue detection
-FREQUENCY_THRESHOLDS = {
-    'low': 3.0,        # Low severity - starting to show fatigue
-    'medium': 5.0,     # Medium severity - noticeable fatigue
-    'high': 7.0,       # High severity - significant fatigue
-    'critical': 10.0,  # Critical severity - severe audience exhaustion
-}
-
-# Ideal frequency value (target)
-IDEAL_FREQUENCY: float = 2.5
+# Note: Frequency thresholds are configured in settings:
+# settings.frequency_low, settings.frequency_medium, settings.frequency_high,
+# settings.frequency_critical, settings.frequency_ideal
 
 
 class AnomalyType(str, Enum):
@@ -500,15 +493,16 @@ class AnomalyDetector:
         
         # 5. Detectar frequency alta (fadiga de audiência)
         if 'frequency' in df_analysis.columns:
+            from shared.config import settings
             freq = current.get('frequency', 0)
-            if freq > FREQUENCY_THRESHOLDS['low']:
-                # Determine severity based on frequency thresholds
+            if freq > settings.frequency_low:
+                # Determine severity based on frequency thresholds from settings
                 severity = SeverityLevel.LOW
-                if freq > FREQUENCY_THRESHOLDS['medium']:
+                if freq > settings.frequency_medium:
                     severity = SeverityLevel.MEDIUM
-                if freq > FREQUENCY_THRESHOLDS['high']:
+                if freq > settings.frequency_high:
                     severity = SeverityLevel.HIGH
-                if freq > FREQUENCY_THRESHOLDS['critical']:
+                if freq > settings.frequency_critical:
                     severity = SeverityLevel.CRITICAL
 
                 anomalies.append(DetectedAnomaly(
@@ -517,8 +511,8 @@ class AnomalyDetector:
                     anomaly_type=AnomalyType.FREQUENCY_ALERT,
                     metric_name='frequency',
                     observed_value=freq,
-                    expected_value=IDEAL_FREQUENCY,
-                    deviation_score=freq / IDEAL_FREQUENCY,
+                    expected_value=settings.frequency_ideal,
+                    deviation_score=freq / settings.frequency_ideal,
                     severity=severity,
                     anomaly_date=analysis_date,
                     description=f"Frequência alta ({freq:.1f}). Risco de fadiga de audiência."

@@ -664,6 +664,55 @@ class DataService:
             return entity.adset_id
         return None
 
+    async def get_entity_names(
+        self,
+        config_id: int,
+        entity_type: str,
+        entity_id: str
+    ) -> dict:
+        """
+        Obtém os nomes da entidade e seus parents para identificação visual.
+
+        Args:
+            config_id: ID da configuração
+            entity_type: 'campaign', 'adset', ou 'ad'
+            entity_id: ID da entidade
+
+        Returns:
+            Dict com campaign_name, adset_name, ad_name conforme aplicável
+        """
+        result = {
+            'campaign_name': None,
+            'adset_name': None,
+            'ad_name': None,
+        }
+
+        if entity_type == "campaign":
+            campaign = await self._get_campaign_info(config_id, entity_id)
+            if campaign:
+                result['campaign_name'] = campaign.name
+        elif entity_type == "adset":
+            adset = await self._get_adset_info(config_id, entity_id)
+            if adset:
+                result['adset_name'] = adset.name
+                # Get parent campaign name
+                campaign = await self._get_campaign_info(config_id, adset.campaign_id)
+                if campaign:
+                    result['campaign_name'] = campaign.name
+        elif entity_type == "ad":
+            ad = await self._get_ad_info(config_id, entity_id)
+            if ad:
+                result['ad_name'] = ad.name
+                # Get parent adset and campaign names
+                adset = await self._get_adset_info(config_id, ad.adset_id)
+                if adset:
+                    result['adset_name'] = adset.name
+                    campaign = await self._get_campaign_info(config_id, adset.campaign_id)
+                    if campaign:
+                        result['campaign_name'] = campaign.name
+
+        return result
+
     async def _get_sibling_metrics(
         self,
         config_id: int,

@@ -152,6 +152,11 @@ class ClassificationService:
             )
             previous_tier = previous.tier if previous else None
 
+            # Obter nomes da entidade para identificação visual
+            entity_names = await self.data_service.get_entity_names(
+                config_id, entity_type, entity_id
+            )
+
             # Salvar classificação
             saved = await self.ml_repo.create_classification(
                 config_id=config_id,
@@ -164,6 +169,9 @@ class ClassificationService:
                 feature_importances=result.feature_importances,
                 previous_tier=previous_tier,
                 model_version=model_version,
+                campaign_name=entity_names.get('campaign_name'),
+                adset_name=entity_names.get('adset_name'),
+                ad_name=entity_names.get('ad_name'),
             )
 
             classifications.append(self._to_response_dict(saved))

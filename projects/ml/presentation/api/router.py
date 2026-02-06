@@ -10,6 +10,7 @@ from projects.ml.presentation.api.routes import (
     recommendations,
     anomalies,
     models,
+    impact,
 )
 
 # Router público (health checks)
@@ -24,6 +25,7 @@ authenticated_router.include_router(classifications.router, prefix="/classificat
 authenticated_router.include_router(recommendations.router, prefix="/recommendations", tags=["ML - Recommendations"])
 authenticated_router.include_router(anomalies.router, prefix="/anomalies", tags=["ML - Anomalies"])
 authenticated_router.include_router(models.router, prefix="/models", tags=["ML - Models"])
+authenticated_router.include_router(impact.router, prefix="/impact", tags=["ML - Impact"])
 
 # Router principal
 ml_router = APIRouter()

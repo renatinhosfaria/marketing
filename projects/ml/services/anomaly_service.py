@@ -252,6 +252,11 @@ class AnomalyService:
                     )
                     return False
             
+            # Obter nomes da entidade para identificação visual
+            entity_names = await self.data_service.get_entity_names(
+                config_id, anomaly.entity_type, anomaly.entity_id
+            )
+
             # Criar anomalia
             created_anomaly = await self.ml_repo.create_anomaly(
                 config_id=config_id,
@@ -264,6 +269,9 @@ class AnomalyService:
                 deviation_score=anomaly.deviation_score,
                 severity=db_severity,
                 anomaly_date=anomaly.anomaly_date,
+                campaign_name=entity_names.get('campaign_name'),
+                adset_name=entity_names.get('adset_name'),
+                ad_name=entity_names.get('ad_name'),
             )
 
             logger.info(

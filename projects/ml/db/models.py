@@ -180,6 +180,11 @@ class MLPrediction(Base):
     )  # campaign, adset, ad
     entity_id: Mapped[str] = mapped_column(String(100), nullable=False)
 
+    # Nomes para identificação visual
+    campaign_name: Mapped[Optional[str]] = mapped_column(String(255))
+    adset_name: Mapped[Optional[str]] = mapped_column(String(255))
+    ad_name: Mapped[Optional[str]] = mapped_column(String(255))
+
     # Tipo e horizonte
     prediction_type: Mapped[PredictionType] = mapped_column(
         Enum(PredictionType), nullable=False
@@ -231,6 +236,11 @@ class MLClassification(Base):
         String(20), nullable=False, default="campaign"
     )
     parent_id: Mapped[Optional[str]] = mapped_column(String(100))
+
+    # Nomes para identificação visual
+    campaign_name: Mapped[Optional[str]] = mapped_column(String(255))
+    adset_name: Mapped[Optional[str]] = mapped_column(String(255))
+    ad_name: Mapped[Optional[str]] = mapped_column(String(255))
 
     # Classificacao atual
     tier: Mapped[CampaignTier] = mapped_column(
@@ -288,6 +298,11 @@ class MLRecommendation(Base):
     entity_type: Mapped[str] = mapped_column(String(50), nullable=False)
     entity_id: Mapped[str] = mapped_column(String(100), nullable=False)
 
+    # Nomes para identificação visual
+    campaign_name: Mapped[Optional[str]] = mapped_column(String(255))
+    adset_name: Mapped[Optional[str]] = mapped_column(String(255))
+    ad_name: Mapped[Optional[str]] = mapped_column(String(255))
+
     # Detalhes da recomendação
     recommendation_type: Mapped[RecommendationType] = mapped_column(
         Enum(RecommendationType), nullable=False
@@ -343,6 +358,11 @@ class MLAnomaly(Base):
     # Entidade
     entity_type: Mapped[str] = mapped_column(String(50), nullable=False)
     entity_id: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    # Nomes para identificação visual
+    campaign_name: Mapped[Optional[str]] = mapped_column(String(255))
+    adset_name: Mapped[Optional[str]] = mapped_column(String(255))
+    ad_name: Mapped[Optional[str]] = mapped_column(String(255))
 
     # Detalhes da anomalia
     anomaly_type: Mapped[str] = mapped_column(
@@ -403,6 +423,11 @@ class MLFeature(Base):
     )
     parent_id: Mapped[Optional[str]] = mapped_column(String(100))
 
+    # Nomes para identificação visual
+    campaign_name: Mapped[Optional[str]] = mapped_column(String(255))
+    adset_name: Mapped[Optional[str]] = mapped_column(String(255))
+    ad_name: Mapped[Optional[str]] = mapped_column(String(255))
+
     # Configuracao
     window_days: Mapped[int] = mapped_column(Integer, nullable=False)
     feature_date: Mapped[datetime] = mapped_column(DateTime, nullable=False)
@@ -440,6 +465,11 @@ class MLForecast(Base):
     # Entidade alvo
     entity_type: Mapped[str] = mapped_column(String(50), nullable=False)
     entity_id: Mapped[str] = mapped_column(String(100), nullable=False)
+
+    # Nomes para identificação visual
+    campaign_name: Mapped[Optional[str]] = mapped_column(String(255))
+    adset_name: Mapped[Optional[str]] = mapped_column(String(255))
+    ad_name: Mapped[Optional[str]] = mapped_column(String(255))
 
     # Detalhes do forecast
     target_metric: Mapped[str] = mapped_column(String(50), nullable=False)
@@ -534,6 +564,11 @@ class MLClassificationFeedback(Base):
     entity_type: Mapped[str] = mapped_column(
         String(20), nullable=False, default="campaign"
     )
+
+    # Nomes para identificação visual
+    campaign_name: Mapped[Optional[str]] = mapped_column(String(255))
+    adset_name: Mapped[Optional[str]] = mapped_column(String(255))
+    ad_name: Mapped[Optional[str]] = mapped_column(String(255))
 
     # Original classification
     original_tier: Mapped[CampaignTier] = mapped_column(
