@@ -12,6 +12,7 @@ from sqlalchemy import (
     String,
     Text,
     Boolean,
+    Float,
     DateTime,
     JSON,
     LargeBinary,
@@ -174,4 +175,72 @@ class AgentFeedback(Base):
     __table_args__ = (
         CheckConstraint("rating >= 1 AND rating <= 5", name="check_rating_range"),
         Index("idx_agent_feedback_user", "user_id"),
+    )
+
+
+class ConversationSummary(Base):
+    """
+    Sumarios de conversas para memoria de longo prazo.
+    Armazena resumos compactos de conversas longas para preservar contexto
+    sem estourar o limite de tokens do LLM.
+    """
+    __tablename__ = "agent_conversation_summaries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    thread_id: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    config_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    summary_text: Mapped[str] = mapped_column(Text, nullable=False)
+    token_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    messages_summarized: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_message_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class MemoryEmbedding(Base):
+    """
+    Embeddings vetoriais para busca semantica na memoria do agente.
+    Armazena representacoes vetoriais de mensagens, sumarios e entidades.
+    """
+    __tablename__ = "agent_memory_embeddings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    config_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    thread_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    source_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    source_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    metadata_: Mapped[Optional[dict]] = mapped_column("metadata_", JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("idx_memory_embeddings_user_type", "user_id", "source_type"),
+    )
+
+
+class UserEntity(Base):
+    """
+    Entidades extraidas de conversas para memoria estruturada.
+    Persiste conhecimento sobre campanhas, metricas, preferencias
+    e insights do usuario entre conversas.
+    """
+    __tablename__ = "agent_user_entities"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    config_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    entity_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    entity_value: Mapped[str] = mapped_column(Text, nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.8)
+    source_thread_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    mention_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index("idx_user_entities_user_type", "user_id", "entity_type"),
+        Index("idx_user_entities_key", "user_id", "entity_key", unique=True),
     )

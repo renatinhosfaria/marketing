@@ -1,8 +1,8 @@
 """Nós do grafo do Orchestrator."""
+from projects.agent.orchestrator.nodes.load_memory import load_memory
 from projects.agent.orchestrator.nodes.parse_request import (
     parse_request,
     detect_intent,
-    extract_campaign_references
 )
 from projects.agent.orchestrator.nodes.plan_execution import (
     plan_execution,
@@ -23,11 +23,12 @@ from projects.agent.orchestrator.nodes.synthesize import (
     format_results_for_synthesis,
     prioritize_results
 )
+from projects.agent.orchestrator.nodes.persist_memory import persist_memory
 
 __all__ = [
+    "load_memory",
     "parse_request",
     "detect_intent",
-    "extract_campaign_references",
     "plan_execution",
     "create_execution_plan",
     "dispatch_agents",
@@ -39,4 +40,5 @@ __all__ = [
     "synthesize",
     "format_results_for_synthesis",
     "prioritize_results",
+    "persist_memory",
 ]

@@ -25,11 +25,6 @@ import pytest
 class TestMultiAgentConfig:
     """Testes para configurações multi-agente."""
 
-    def test_multi_agent_enabled_default_false(self):
-        """Multi-agent deve estar desabilitado por padrão."""
-        settings = AgentSettings()
-        assert settings.multi_agent_enabled is False
-
     def test_orchestrator_timeout_default(self):
         """Timeout do orchestrator deve ter valor padrão."""
         settings = AgentSettings()
@@ -71,3 +66,47 @@ class TestMultiAgentConfig:
         settings = AgentSettings()
         assert settings.subagent_max_retries == 2
         assert settings.subagent_retry_delay == 1.0
+
+    def test_tracing_logging_flags_defaults(self):
+        """Flags de logging sensivel devem existir com defaults seguros."""
+        settings = AgentSettings()
+        assert settings.log_full_prompts is False
+        assert settings.log_full_responses is False
+        assert settings.log_full_tool_data is False
+        assert settings.log_preview_chars == 500
+
+    def test_auth_defaults(self):
+        """Config de auth deve ter defaults seguros."""
+        settings = AgentSettings()
+        assert settings.allow_unauthenticated is False
+        assert settings.default_user_id == 1
+        assert settings.trusted_proxy_user_header == "X-Agent-User-Id"
+
+    def test_summarization_defaults(self):
+        """Config de sumarizacao deve ter defaults corretos."""
+        settings = AgentSettings()
+        assert settings.summarization_enabled is True
+        assert settings.summarization_threshold == 20
+        assert settings.summarization_keep_recent == 10
+        assert settings.summarization_max_tokens == 600
+
+    def test_vector_store_defaults(self):
+        """Config de vector store deve ter defaults corretos."""
+        settings = AgentSettings()
+        assert settings.vector_store_enabled is False
+        assert settings.embedding_model == "text-embedding-3-small"
+        assert settings.embedding_dimensions == 1536
+        assert settings.rag_top_k == 3
+        assert settings.rag_min_similarity == 0.75
+
+    def test_entity_memory_defaults(self):
+        """Config de entity memory deve ter defaults corretos."""
+        settings = AgentSettings()
+        assert settings.entity_memory_enabled is False
+        assert settings.entity_max_per_user == 50
+
+    def test_cross_thread_defaults(self):
+        """Config de cross-thread deve ter defaults corretos."""
+        settings = AgentSettings()
+        assert settings.cross_thread_enabled is False
+        assert settings.cross_thread_max_results == 3

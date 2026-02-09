@@ -43,6 +43,29 @@ class AgentSettings(BaseSettings):
         description="API Key da OpenAI"
     )
 
+    # Auth
+    allow_unauthenticated: bool = Field(
+        default=False,
+        description="Permite acesso sem credencial (modo single-tenant controlado por rede)"
+    )
+    default_user_id: int = Field(
+        default=1,
+        ge=1,
+        description="User ID padrão quando allow_unauthenticated=True"
+    )
+    trusted_proxy_user_header: str = Field(
+        default="X-Agent-User-Id",
+        description="Header de usuário injetado por proxy confiável"
+    )
+    trusted_proxy_secret_header: str = Field(
+        default="X-Agent-Proxy-Secret",
+        description="Header com segredo compartilhado do proxy"
+    )
+    trusted_proxy_secret: str | None = Field(
+        default=None,
+        description="Segredo esperado para aceitar trusted_proxy_user_header"
+    )
+
     # Performance
     timeout_seconds: int = Field(
         default=60,
@@ -64,17 +87,99 @@ class AgentSettings(BaseSettings):
     )
 
     # Rate Limiting
+    rate_limit_enabled: bool = Field(
+        default=True,
+        description="Habilitar rate limiting na API"
+    )
     rate_limit_per_minute: int = Field(
         default=20,
         ge=1,
         le=100,
         description="Requisições por minuto por usuário"
     )
+    rate_limit_per_hour: int = Field(
+        default=200,
+        ge=10,
+        le=5000,
+        description="Requisições por hora por usuário"
+    )
     rate_limit_per_day: int = Field(
         default=500,
         ge=10,
         le=10000,
         description="Requisições por dia por usuário"
+    )
+
+    # Summarization Memory
+    summarization_enabled: bool = Field(
+        default=True,
+        description="Habilitar sumarizacao automatica de conversas longas"
+    )
+    summarization_threshold: int = Field(
+        default=20,
+        ge=5,
+        le=100,
+        description="Numero de mensagens nao-system que triggera sumarizacao"
+    )
+    summarization_keep_recent: int = Field(
+        default=10,
+        ge=3,
+        le=50,
+        description="Quantas mensagens recentes manter intactas apos sumarizacao"
+    )
+    summarization_max_tokens: int = Field(
+        default=600,
+        ge=100,
+        le=2000,
+        description="Maximo de tokens para o sumario gerado"
+    )
+
+    # Vector Store / RAG
+    vector_store_enabled: bool = Field(
+        default=False,
+        description="Habilitar armazenamento e busca vetorial"
+    )
+    embedding_model: str = Field(
+        default="text-embedding-3-small",
+        description="Modelo de embeddings (OpenAI)"
+    )
+    embedding_dimensions: int = Field(
+        default=1536,
+        description="Dimensoes do vetor de embedding"
+    )
+    rag_top_k: int = Field(
+        default=3,
+        description="Numero de resultados RAG a injetar no contexto"
+    )
+    rag_min_similarity: float = Field(
+        default=0.75,
+        ge=0.0,
+        le=1.0,
+        description="Similaridade minima para resultados RAG"
+    )
+
+    # Entity Memory
+    entity_memory_enabled: bool = Field(
+        default=False,
+        description="Habilitar extracao e persistencia de entidades"
+    )
+    entity_max_per_user: int = Field(
+        default=50,
+        ge=10,
+        le=200,
+        description="Maximo de entidades por usuario"
+    )
+
+    # Cross-thread Memory
+    cross_thread_enabled: bool = Field(
+        default=False,
+        description="Habilitar memoria entre threads diferentes do mesmo usuario"
+    )
+    cross_thread_max_results: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Maximo de resultados cross-thread a injetar"
     )
 
     # Persistência
@@ -89,11 +194,7 @@ class AgentSettings(BaseSettings):
         description="TTL de conversas em dias"
     )
 
-    # Multi-Agent System
-    multi_agent_enabled: bool = Field(
-        default=False,
-        description="Habilitar sistema multi-agente"
-    )
+    # Orchestrator
     orchestrator_timeout: int = Field(
         default=120,
         ge=30,
@@ -157,6 +258,26 @@ class AgentSettings(BaseSettings):
         ge=0.0,
         le=1.0,
         description="Temperature para síntese de respostas"
+    )
+
+    # Tracing / Logging de conteúdo sensível
+    log_full_prompts: bool = Field(
+        default=False,
+        description="Se True, registra prompt completo no tracing"
+    )
+    log_full_responses: bool = Field(
+        default=False,
+        description="Se True, registra resposta completa do LLM no tracing"
+    )
+    log_full_tool_data: bool = Field(
+        default=False,
+        description="Se True, registra payload completo de params/result de tools"
+    )
+    log_preview_chars: int = Field(
+        default=500,
+        ge=50,
+        le=5000,
+        description="Quantidade máxima de caracteres em previews de logs"
     )
 
     # Subagent Retry

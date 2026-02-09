@@ -7,21 +7,22 @@ from typing import TypedDict, Annotated, Sequence, Optional, Any
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 
+from projects.agent.subagents.state import AgentResult
 
-# Re-definir AgentResult aqui para evitar import circular via app/agent/__init__.py
-# A definicao canonica esta em app/agent/subagents/state.py
-class AgentResult(TypedDict):
-    """Resultado de execucao de um subagente.
 
-    Nota: Esta e uma copia da definicao em subagents/state.py para evitar
-    problemas de import circular. Manter sincronizado se houver mudancas.
+def _merge_agent_results(
+    existing: dict[str, AgentResult],
+    new: dict[str, AgentResult],
+) -> dict[str, AgentResult]:
+    """Reducer para combinar resultados de subagentes paralelos.
+
+    Cada subagente retorna {"agent_results": {nome: resultado}}.
+    O reducer faz merge dos dicts para acumular todos os resultados.
     """
-    agent_name: str
-    success: bool
-    data: Optional[dict[str, Any]]
-    error: Optional[str]
-    duration_ms: int
-    tool_calls: list[str]
+    result = dict(existing) if existing else {}
+    if new:
+        result.update(new)
+    return result
 
 
 # Agentes válidos no sistema
@@ -92,12 +93,17 @@ class OrchestratorState(TypedDict):
     required_agents: list[str]
     execution_plan: Optional[ExecutionPlan]
 
-    # Resultados dos subagentes
-    agent_results: dict[str, AgentResult]
+    # Resultados dos subagentes (reducer para merge de resultados paralelos)
+    agent_results: Annotated[dict[str, AgentResult], _merge_agent_results]
 
     # Resposta final
     synthesized_response: Optional[str]
     confidence_score: float
+
+    # Memoria
+    conversation_summary: Optional[str]
+    retrieved_context: Optional[list[dict]]
+    user_entities: Optional[list[dict]]
 
     # Erro
     error: Optional[str]
@@ -131,6 +137,9 @@ def create_initial_orchestrator_state(
         agent_results={},
         synthesized_response=None,
         confidence_score=0.0,
+        conversation_summary=None,
+        retrieved_context=None,
+        user_entities=None,
         error=None
     )
 
