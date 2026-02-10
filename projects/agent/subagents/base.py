@@ -7,7 +7,7 @@ para definir comportamento especializado.
 """
 from abc import ABC, abstractmethod
 from typing import Any, Sequence, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import asyncio
 import json
 import time
@@ -18,6 +18,8 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AI
 from langchain_core.tools import BaseTool
 from langgraph.graph import StateGraph, START, END
 from langgraph.prebuilt import ToolNode
+
+from projects.agent.utils.messages import truncate_messages
 
 from .state import (
     SubagentState,
@@ -166,11 +168,11 @@ class BaseSubagent(ABC):
 
         return {
             "messages": messages,
-            "started_at": datetime.utcnow()
+            "started_at": datetime.now(timezone.utc)
         }
 
-    def _call_model_node(self, state: SubagentState) -> dict:
-        """No que chama o modelo LLM.
+    async def _call_model_node(self, state: SubagentState) -> dict:
+        """No que chama o modelo LLM (async).
 
         Args:
             state: Estado atual do subagente
@@ -195,9 +197,9 @@ class BaseSubagent(ABC):
                 from projects.agent.llm.provider import get_llm
                 llm = get_llm()
 
-            # Invocar LLM com mensagens do estado
+            # Invocar LLM com mensagens do estado (async)
             messages = state.get("messages", [])
-            response = llm.invoke(messages)
+            response = await llm.ainvoke(messages)
 
             logger.debug(
                 "LLM invocado",
@@ -206,8 +208,14 @@ class BaseSubagent(ABC):
                 tool_calls_count=len(response.tool_calls) if hasattr(response, 'tool_calls') and response.tool_calls else 0
             )
 
+            current_tool_calls = int(state.get("tool_calls_count", 0) or 0)
+            new_tool_calls = 0
+            if hasattr(response, "tool_calls") and response.tool_calls:
+                new_tool_calls = len(response.tool_calls)
+
             return {
-                "messages": [response]
+                "messages": [response],
+                "tool_calls_count": current_tool_calls + new_tool_calls,
             }
 
         except Exception as e:
@@ -222,7 +230,8 @@ class BaseSubagent(ABC):
             )
             return {
                 "messages": [response],
-                "error": str(e)
+                "error": str(e),
+                "tool_calls_count": int(state.get("tool_calls_count", 0) or 0),
             }
 
     def _respond_node(self, state: SubagentState) -> dict:
@@ -247,7 +256,7 @@ class BaseSubagent(ABC):
 
         return {
             "result": result,
-            "completed_at": datetime.utcnow()
+            "completed_at": datetime.now(timezone.utc)
         }
 
     def _should_call_tools(self, state: SubagentState) -> str:
@@ -259,6 +268,13 @@ class BaseSubagent(ABC):
         Returns:
             "call_tools" se houver tool_calls, "respond" caso contrario
         """
+        from projects.agent.config import get_agent_settings
+
+        max_tool_calls = get_agent_settings().max_tool_calls
+        tool_calls_count = int(state.get("tool_calls_count", 0) or 0)
+        if tool_calls_count >= max_tool_calls:
+            return "respond"
+
         messages = state.get("messages", [])
         if not messages:
             return "respond"
@@ -280,26 +296,20 @@ class BaseSubagent(ABC):
             String formatada com descricao e contexto da tarefa
         """
         task = state.get("task", {})
-        description = task.get("description", "No description provided")
+        description = task.get("description", "")
         context = task.get("context", {})
-        priority = task.get("priority", 3)
+        user_question = task.get("user_question", "")
 
         context_str = json.dumps(context, indent=2, ensure_ascii=False) if context else "{}"
 
-        return f"""## Task
-{description}
+        parts = []
+        if user_question:
+            parts.append(f"## Pergunta do usuario\n{user_question}")
+        parts.append(f"## Tarefa\n{description}")
+        parts.append(f"## Dados disponiveis\n```json\n{context_str}\n```")
+        parts.append("Responda focado na pergunta do usuario. Use as tools disponiveis se precisar de mais dados.")
 
-## Context
-```json
-{context_str}
-```
-
-## Priority
-{priority} (1 = highest, 5 = lowest)
-
-## Instructions
-Analyze the task and context above. Use available tools if needed.
-Provide a clear and actionable response."""
+        return "\n\n".join(parts)
 
     def _extract_tool_calls(self, messages: Sequence[BaseMessage]) -> list[str]:
         """Extrai nomes das ferramentas chamadas das mensagens.
@@ -338,16 +348,27 @@ Provide a clear and actionable response."""
         """
         import copy
 
-        # Criar cópia da tool para não modificar a original
-        wrapped_tool = copy.copy(tool)
+        # Criar cópia profunda da tool para não modificar a original
+        try:
+            wrapped_tool = copy.deepcopy(tool)
+        except TypeError:
+            wrapped_tool = copy.copy(tool)
+        # LangChain tools: .coroutine para async, .func para sync
+        original_coroutine = getattr(tool, 'coroutine', None)
         original_func = tool.func
 
-        # Verificar se é async
-        if asyncio.iscoroutinefunction(original_func):
+        # Verificar se a tool e async (tem coroutine ou func e async)
+        is_async = (
+            original_coroutine is not None
+            or asyncio.iscoroutinefunction(original_func)
+        )
+        async_callable = original_coroutine or original_func
+
+        if is_async:
             async def logged_tool_async(*args, **kwargs):
                 start = time.time()
                 try:
-                    result = await original_func(*args, **kwargs)
+                    result = await async_callable(*args, **kwargs)
                     duration = (time.time() - start) * 1000
 
                     log_tool_call(
@@ -369,7 +390,7 @@ Provide a clear and actionable response."""
                     )
                     raise
 
-            wrapped_tool.func = logged_tool_async
+            wrapped_tool.coroutine = logged_tool_async
         else:
             def logged_tool_sync(*args, **kwargs):
                 start = time.time()
@@ -421,7 +442,15 @@ Provide a clear and actionable response."""
         Returns:
             AgentResult com resultado da execucao
         """
-        start_time = datetime.utcnow()
+        start_time = datetime.now(timezone.utc)
+
+        # Truncar mensagens para respeitar limite de contexto
+        if messages is not None:
+            from projects.agent.config import get_agent_settings
+            messages = truncate_messages(
+                messages,
+                max_messages=get_agent_settings().max_conversation_messages,
+            )
 
         # Criar estado inicial
         initial_state = create_initial_subagent_state(
@@ -443,7 +472,7 @@ Provide a clear and actionable response."""
             )
 
             # Calcular duracao
-            end_time = datetime.utcnow()
+            end_time = datetime.now(timezone.utc)
             duration_ms = int((end_time - start_time).total_seconds() * 1000)
 
             # Extrair resultado
@@ -461,7 +490,7 @@ Provide a clear and actionable response."""
             )
 
         except asyncio.TimeoutError:
-            end_time = datetime.utcnow()
+            end_time = datetime.now(timezone.utc)
             duration_ms = int((end_time - start_time).total_seconds() * 1000)
 
             return AgentResult(
@@ -474,7 +503,7 @@ Provide a clear and actionable response."""
             )
 
         except Exception as e:
-            end_time = datetime.utcnow()
+            end_time = datetime.now(timezone.utc)
             duration_ms = int((end_time - start_time).total_seconds() * 1000)
 
             return AgentResult(
