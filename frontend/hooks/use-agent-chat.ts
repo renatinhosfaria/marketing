@@ -24,18 +24,22 @@ export function useAgentChat(accountId: string) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
-  // Thread ID persistido na URL
-  const threadId = searchParams.get("thread") || generateId();
+  // Thread ID persistido na URL (lazy init para nao gerar ID novo a cada render)
+  const [initialThreadId] = useState(() => searchParams.get("thread") || generateId());
+  const threadId = searchParams.get("thread") || initialThreadId;
   const threadIdRef = useRef(threadId);
+
+  // Estabilizar searchParams como string para evitar re-renders em useCallback
+  const searchParamsString = searchParams.toString();
 
   // Persistir threadId na URL na primeira carga
   useEffect(() => {
     if (!searchParams.get("thread")) {
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(searchParamsString);
       params.set("thread", threadIdRef.current);
       router.replace(`?${params.toString()}`, { scroll: false });
     }
-  }, [router, searchParams]);
+  }, [router, searchParams, searchParamsString]);
 
   // Atualizar ref quando threadId muda
   useEffect(() => {
@@ -68,12 +72,12 @@ export function useAgentChat(accountId: string) {
     async (newThreadId: string) => {
       threadIdRef.current = newThreadId;
       setInterrupt(null);
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(searchParamsString);
       params.set("thread", newThreadId);
       router.replace(`?${params.toString()}`, { scroll: false });
       await loadMessages(newThreadId);
     },
-    [router, searchParams, loadMessages]
+    [router, searchParamsString, loadMessages]
   );
 
   const startNewConversation = useCallback(() => {
@@ -81,10 +85,10 @@ export function useAgentChat(accountId: string) {
     threadIdRef.current = newId;
     setMessages([]);
     setInterrupt(null);
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParamsString);
     params.set("thread", newId);
     router.replace(`?${params.toString()}`, { scroll: false });
-  }, [router, searchParams]);
+  }, [router, searchParamsString]);
 
   /**
    * Processa o stream SSE de resposta do agente.

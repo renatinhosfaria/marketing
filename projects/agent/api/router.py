@@ -6,6 +6,7 @@ GET /health: healthcheck do servico.
 """
 
 import asyncio
+import re
 import time
 
 from fastapi import APIRouter, Request, Depends, HTTPException
@@ -33,6 +34,10 @@ from projects.agent.observability.metrics import (
     agent_active_streams,
 )
 
+import structlog
+
+logger = structlog.get_logger()
+
 router = APIRouter()
 
 # Controle de streams concorrentes por usuario via Semaphore
@@ -57,6 +62,11 @@ def _build_thread_id(thread_id: str, user_id: str, account_id: str) -> str:
     Se vier um UUID puro do frontend, prefixamos.
     Se vier prefixado, validamos que user/account conferem.
     """
+    # Validar formato: apenas alfanumericos, hifens e underscores
+    raw_id = thread_id.split(":")[-1] if ":" in thread_id else thread_id
+    if not re.match(r'^[\w\-]+$', raw_id):
+        raise HTTPException(400, "thread_id contem caracteres invalidos.")
+
     prefix = f"{user_id}:{account_id}:"
     if thread_id.startswith(prefix):
         return thread_id  # Ja prefixado corretamente
@@ -365,25 +375,26 @@ async def delete_conversation(
     safe_thread_id = _build_thread_id(thread_id, str(user.user_id), account_id)
 
     async with checkpointer.conn.connection() as conn:
-        await conn.execute(
-            "DELETE FROM checkpoint_writes WHERE thread_id = %s",
-            (safe_thread_id,),
-        )
-        await conn.execute(
-            "DELETE FROM checkpoint_blobs WHERE thread_id = %s",
-            (safe_thread_id,),
-        )
-        await conn.execute(
-            "DELETE FROM checkpoints WHERE thread_id = %s",
-            (safe_thread_id,),
-        )
+        async with conn.transaction():
+            await conn.execute(
+                "DELETE FROM checkpoint_writes WHERE thread_id = %s",
+                (safe_thread_id,),
+            )
+            await conn.execute(
+                "DELETE FROM checkpoint_blobs WHERE thread_id = %s",
+                (safe_thread_id,),
+            )
+            await conn.execute(
+                "DELETE FROM checkpoints WHERE thread_id = %s",
+                (safe_thread_id,),
+            )
 
     # Delete title from store
     ns = StoreNamespace.conversation_titles(str(user.user_id), account_id)
     try:
         await store.adelete(ns, thread_id)
-    except Exception:
-        pass  # Title may not exist yet
+    except Exception as e:
+        logger.warning("title.delete_failed", thread_id=thread_id, error=str(e))
 
     return {"status": "deleted", "thread_id": thread_id}
 
