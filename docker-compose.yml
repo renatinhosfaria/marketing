@@ -2,33 +2,6 @@
 # Build unico com reutilizacao de imagem para todos os servicos
 
 services:
-  # ==================== Traefik (Proxy Reverso) ====================
-  marketing-traefik:
-    image: traefik:v3.3
-    container_name: marketing-traefik
-    restart: unless-stopped
-    command:
-      - "--api.dashboard=false"
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.letsencryptresolver.acme.httpchallenge=true"
-      - "--certificatesresolvers.letsencryptresolver.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.letsencryptresolver.acme.email=${ACME_EMAIL:-admin@famachat.com.br}"
-      - "--certificatesresolvers.letsencryptresolver.acme.storage=/letsencrypt/acme.json"
-      # Redirect HTTP -> HTTPS
-      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - traefik_letsencrypt:/letsencrypt
-    networks:
-      - marketing-network
-
   # ==================== Frontend Next.js ====================
   marketing-frontend:
     build:
@@ -41,6 +14,8 @@ services:
     image: marketing-frontend:latest
     container_name: marketing-frontend
     restart: unless-stopped
+    ports:
+      - "8000:3001"
     environment:
       - NODE_ENV=production
       - API_INTERNAL_URL=http://marketing-api:8000
@@ -63,14 +38,6 @@ services:
         reservations:
           cpus: '0.1'
           memory: 128M
-      labels:
-        - "traefik.enable=true"
-        - "traefik.http.routers.marketing_frontend.rule=Host(`marketing.famachat.com.br`) && !PathPrefix(`/api/`) && !PathPrefix(`/flower/`)"
-        - "traefik.http.routers.marketing_frontend.entrypoints=websecure"
-        - "traefik.http.routers.marketing_frontend.priority=1"
-        - "traefik.http.routers.marketing_frontend.tls=true"
-        - "traefik.http.routers.marketing_frontend.tls.certresolver=letsencryptresolver"
-        - "traefik.http.services.marketing_frontend.loadbalancer.server.port=3001"
     logging:
       driver: "json-file"
       options:
@@ -89,6 +56,8 @@ services:
       target: production
     container_name: marketing-api
     restart: unless-stopped
+    ports:
+      - "8001:8000"
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=redis://marketing-redis:6379/0
@@ -118,14 +87,6 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
-      labels:
-        - "traefik.enable=true"
-        - "traefik.http.routers.marketing_api.rule=Host(`marketing.famachat.com.br`) && PathPrefix(`/api/`)"
-        - "traefik.http.routers.marketing_api.entrypoints=websecure"
-        - "traefik.http.routers.marketing_api.priority=5"
-        - "traefik.http.routers.marketing_api.tls=true"
-        - "traefik.http.routers.marketing_api.tls.certresolver=letsencryptresolver"
-        - "traefik.http.services.marketing_api.loadbalancer.server.port=8000"
     logging:
       driver: "json-file"
       options:
@@ -140,6 +101,8 @@ services:
     image: marketing:latest
     container_name: marketing-fb-ads
     restart: unless-stopped
+    ports:
+      - "8003:8002"
     command: ["uvicorn", "app.fb_ads_main:app", "--host", "0.0.0.0", "--port", "8002"]
     environment:
       - DATABASE_URL=${DATABASE_URL}
@@ -173,14 +136,6 @@ services:
         reservations:
           cpus: '0.25'
           memory: 128M
-      labels:
-        - "traefik.enable=true"
-        - "traefik.http.routers.marketing_fb_ads.rule=Host(`marketing.famachat.com.br`) && PathPrefix(`/api/v1/facebook-ads`)"
-        - "traefik.http.routers.marketing_fb_ads.entrypoints=websecure"
-        - "traefik.http.routers.marketing_fb_ads.priority=10"
-        - "traefik.http.routers.marketing_fb_ads.tls=true"
-        - "traefik.http.routers.marketing_fb_ads.tls.certresolver=letsencryptresolver"
-        - "traefik.http.services.marketing_fb_ads.loadbalancer.server.port=8002"
     logging:
       driver: "json-file"
       options:
@@ -195,6 +150,8 @@ services:
     image: marketing:latest
     container_name: marketing-agent-api
     restart: unless-stopped
+    ports:
+      - "8008:8001"
     command: ["uvicorn", "app.agent_main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "1", "--loop", "uvloop"]
     environment:
       - DATABASE_URL=${DATABASE_URL}
@@ -227,16 +184,6 @@ services:
         reservations:
           cpus: '0.25'
           memory: 256M
-      labels:
-        - "traefik.enable=true"
-        - "traefik.http.routers.marketing_agent.rule=Host(`marketing.famachat.com.br`) && PathPrefix(`/api/v1/agent`)"
-        - "traefik.http.routers.marketing_agent.entrypoints=websecure"
-        - "traefik.http.routers.marketing_agent.priority=10"
-        - "traefik.http.routers.marketing_agent.tls=true"
-        - "traefik.http.routers.marketing_agent.tls.certresolver=letsencryptresolver"
-        - "traefik.http.services.marketing_agent.loadbalancer.server.port=8001"
-        # SSE: desabilitar buffering para streaming
-        - "traefik.http.services.marketing_agent.loadbalancer.responseForwarding.flushInterval=1ms"
     logging:
       driver: "json-file"
       options:
@@ -397,6 +344,8 @@ services:
       - marketing-fb-ads-worker
     container_name: marketing-flower
     restart: unless-stopped
+    ports:
+      - "5555:5555"
     command: >
       celery -A app.celery flower
       --port=5555
@@ -417,21 +366,11 @@ services:
         limits:
           cpus: '0.25'
           memory: 256M
-      labels:
-        - "traefik.enable=true"
-        - "traefik.http.routers.marketing_flower.rule=Host(`marketing.famachat.com.br`) && PathPrefix(`/flower/`)"
-        - "traefik.http.routers.marketing_flower.entrypoints=websecure"
-        - "traefik.http.routers.marketing_flower.priority=10"
-        - "traefik.http.routers.marketing_flower.tls=true"
-        - "traefik.http.routers.marketing_flower.tls.certresolver=letsencryptresolver"
-        - "traefik.http.services.marketing_flower.loadbalancer.server.port=5555"
     networks:
       - marketing-network
 
 # ==================== VOLUMES ====================
 volumes:
-  traefik_letsencrypt:
-    driver: local
   redis_ml_data:
     driver: local
   celerybeat_schedule:

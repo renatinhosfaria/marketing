@@ -1,10 +1,10 @@
 # Infraestrutura e Deploy
 
-## Proxy Reverso — Traefik
+## Proxy Reverso — Traefik (producao)
 
-Traefik e o unico proxy reverso do projeto, usado tanto em desenvolvimento (`docker-compose.yml`) quanto em producao (`marketing-stack.yml` / Docker Swarm).
+Traefik e o proxy reverso em producao, gerenciado pelo Docker Swarm via `marketing-stack.yml`.
 
-Configuracao via labels nos servicos Docker. Roteamento por prioridade:
+Configuracao via labels nos servicos. Roteamento por prioridade:
 
 | Rota | Servico | Prioridade |
 |------|---------|------------|
@@ -18,11 +18,22 @@ TLS automatico via Let's Encrypt (certresolver `letsencryptresolver`).
 
 ## Docker Compose (desenvolvimento)
 
-Stack em `docker-compose.yml` inclui Traefik como servico. Subir com:
+Stack em `docker-compose.yml` com portas mapeadas diretamente no host. Subir com:
 
 ```bash
 docker compose up -d
 ```
+
+Portas de desenvolvimento:
+
+| Servico | Host:Container |
+|---------|---------------|
+| Frontend | 8000:3001 |
+| ML API | 8001:8000 |
+| FB Ads API | 8003:8002 |
+| Agent API | 8008:8001 |
+| Redis | 8007:6379 |
+| Flower | 5555:5555 |
 
 ## Docker Swarm (producao)
 
@@ -44,4 +55,3 @@ Use `docker compose ps` e `docker compose logs <servico>` para diagnostico.
 - `models_storage` para modelos ML
 - `logs` para logs
 - `redis_ml_data` e `celerybeat_schedule`
-- `traefik_letsencrypt` para certificados TLS
