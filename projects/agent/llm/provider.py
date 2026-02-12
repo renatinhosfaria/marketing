@@ -1,138 +1,60 @@
 """
-Factory para criação de LLM (Claude/OpenAI).
+Gerenciamento de LLMs por papel (role) com fallback automatico.
+
+get_model(role, config): retorna o modelo adequado para o papel.
+
+Roles disponiveis:
+  - supervisor: gpt-4o-mini (rapido, roteamento)
+  - analyst: gpt-4o (analise profunda)
+  - synthesizer: gpt-4o (sintese de respostas)
+  - operations: gpt-4o (operacoes de escrita)
 """
 
-from typing import Optional
-from enum import Enum
-
-from langchain_core.language_models import BaseChatModel
+from langchain.chat_models import init_chat_model
 
 from projects.agent.config import agent_settings
-from shared.core.logging import get_logger
-
-logger = get_logger(__name__)
 
 
-class LLMProvider(str, Enum):
-    """Provedores de LLM suportados."""
-    ANTHROPIC = "anthropic"
-    OPENAI = "openai"
+def get_model(role: str, config: dict = None):
+    """Retorna o modelo para o papel.
 
-
-def get_llm(
-    provider: Optional[str] = None,
-    model: Optional[str] = None,
-    temperature: Optional[float] = None,
-    max_tokens: Optional[int] = None,
-) -> BaseChatModel:
-    """
-    Cria instância do LLM baseado nas configurações.
+    O modelo pode ser sobrescrito via config["configurable"]["{role}_model"].
 
     Args:
-        provider: Provedor (anthropic/openai), usa config se não especificado
-        model: Modelo a usar, usa config se não especificado
-        temperature: Temperatura (0.0-1.0), usa config se não especificado
-        max_tokens: Máximo de tokens, usa config se não especificado
+        role: Papel do modelo (supervisor, analyst, synthesizer, operations).
+        config: RunnableConfig com configurable opcional.
 
     Returns:
-        Instância do LLM configurado
-
-    Raises:
-        ValueError: Se provedor inválido ou API key não configurada
+        ChatModel configurado.
     """
-    # Usar valores das configurações se não especificados
-    provider = provider or agent_settings.llm_provider
-    model = model or agent_settings.llm_model
-    temperature = temperature if temperature is not None else agent_settings.temperature
-    max_tokens = max_tokens or agent_settings.max_tokens
+    config = config or {}
+    configurable = config.get("configurable", {})
 
-    logger.info(
-        "Criando LLM",
-        provider=provider,
-        model=model,
-        temperature=temperature,
-        max_tokens=max_tokens
-    )
+    model_map = {
+        "supervisor": configurable.get(
+            "supervisor_model", agent_settings.supervisor_model
+        ),
+        "analyst": configurable.get(
+            "analyst_model", agent_settings.analyst_model
+        ),
+        "synthesizer": configurable.get(
+            "synthesizer_model", agent_settings.synthesizer_model
+        ),
+        "operations": configurable.get(
+            "operations_model", agent_settings.operations_model
+        ),
+        "title_generator": configurable.get(
+            "title_generator_model", agent_settings.title_generator_model
+        ),
+    }
 
-    if provider == LLMProvider.ANTHROPIC or provider == "anthropic":
-        return _create_anthropic_llm(model, temperature, max_tokens)
-    elif provider == LLMProvider.OPENAI or provider == "openai":
-        return _create_openai_llm(model, temperature, max_tokens)
-    else:
-        raise ValueError(f"Provedor de LLM não suportado: {provider}")
+    model_name = model_map.get(role, agent_settings.analyst_model)
+    provider = agent_settings.default_provider
 
+    kwargs = {}
+    if provider == "openai" and agent_settings.openai_api_key:
+        kwargs["api_key"] = agent_settings.openai_api_key
+    elif provider == "anthropic" and agent_settings.anthropic_api_key:
+        kwargs["api_key"] = agent_settings.anthropic_api_key
 
-def _create_anthropic_llm(
-    model: str,
-    temperature: float,
-    max_tokens: int
-) -> BaseChatModel:
-    """Cria LLM da Anthropic (Claude)."""
-    try:
-        from langchain_anthropic import ChatAnthropic
-    except ImportError:
-        raise ImportError(
-            "langchain-anthropic não instalado. Execute: pip install langchain-anthropic"
-        )
-
-    api_key = agent_settings.anthropic_api_key
-    if not api_key:
-        raise ValueError(
-            "ANTHROPIC_API_KEY não configurada. "
-            "Configure via variável de ambiente ou arquivo .env"
-        )
-
-    return ChatAnthropic(
-        model=model,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        anthropic_api_key=api_key,
-    )
-
-
-def _create_openai_llm(
-    model: str,
-    temperature: float,
-    max_tokens: int
-) -> BaseChatModel:
-    """Cria LLM da OpenAI (GPT)."""
-    try:
-        from langchain_openai import ChatOpenAI
-    except ImportError:
-        raise ImportError(
-            "langchain-openai não instalado. Execute: pip install langchain-openai"
-        )
-
-    api_key = agent_settings.openai_api_key
-    if not api_key:
-        raise ValueError(
-            "OPENAI_API_KEY não configurada. "
-            "Configure via variável de ambiente ou arquivo .env"
-        )
-
-    return ChatOpenAI(
-        model=model,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        openai_api_key=api_key,
-    )
-
-
-def get_llm_with_tools(
-    tools: list,
-    provider: Optional[str] = None,
-    model: Optional[str] = None,
-) -> BaseChatModel:
-    """
-    Cria LLM com tools vinculadas.
-
-    Args:
-        tools: Lista de tools LangChain
-        provider: Provedor de LLM
-        model: Modelo a usar
-
-    Returns:
-        LLM com tools bound
-    """
-    llm = get_llm(provider=provider, model=model)
-    return llm.bind_tools(tools)
+    return init_chat_model(model_name, model_provider=provider, **kwargs)
