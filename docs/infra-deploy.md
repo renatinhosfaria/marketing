@@ -1,10 +1,23 @@
 # Infraestrutura e Deploy
 
-## Proxy Reverso — Traefik (producao)
+## Ambientes
 
-Traefik e o proxy reverso em producao, gerenciado pelo Docker Swarm via `marketing-stack.yml`.
+| Ambiente | Arquivo | Proxy | Comando |
+|----------|---------|-------|---------|
+| **Producao** (VPS) | `marketing-stack.yml` | Traefik (Swarm) | `docker stack deploy -c marketing-stack.yml marketing` |
+| **Desenvolvimento** (local) | `docker-compose.yml` | Nenhum (portas diretas) | `docker compose up -d` |
 
-Configuracao via labels nos servicos. Roteamento por prioridade:
+**NAO rode `docker compose up` na VPS de producao.** Isso cria containers duplicados
+que competem com o Swarm pelo mesmo banco e filas Celery.
+
+## Producao — Docker Swarm + Traefik
+
+### Proxy Reverso (Traefik)
+
+Traefik roda como servico externo na rede `network_public`, compartilhado entre stacks.
+Configuracao via labels nos servicos do `marketing-stack.yml`.
+
+Roteamento por prioridade:
 
 | Rota | Servico | Prioridade |
 |------|---------|------------|
@@ -16,15 +29,25 @@ Configuracao via labels nos servicos. Roteamento por prioridade:
 
 TLS automatico via Let's Encrypt (certresolver `letsencryptresolver`).
 
-## Docker Compose (desenvolvimento)
-
-Stack em `docker-compose.yml` com portas mapeadas diretamente no host. Subir com:
+### Deploy e Redeploy
 
 ```bash
-docker compose up -d
+./scripts/redeploy.sh          # Rebuild + deploy completo
+./scripts/redeploy.sh backend  # Apenas backend
+./scripts/redeploy.sh frontend # Apenas frontend
 ```
 
-Portas de desenvolvimento:
+### Monitoramento
+
+```bash
+docker service ls | grep marketing           # Status dos servicos
+docker service logs marketing_marketing-api  # Logs de um servico
+docker service ps marketing_marketing-api    # Tasks/replicas
+```
+
+## Desenvolvimento — Docker Compose
+
+Stack em `docker-compose.yml` com portas mapeadas diretamente no host:
 
 | Servico | Host:Container |
 |---------|---------------|
@@ -35,20 +58,18 @@ Portas de desenvolvimento:
 | Redis | 8007:6379 |
 | Flower | 5555:5555 |
 
-## Docker Swarm (producao)
-
-Deploy via:
-
-```bash
-docker stack deploy -c marketing-stack.yml marketing
-```
-
-Traefik roda como servico externo na rede `network_public`.
-
 ## Healthchecks
 
 Cada servico possui healthcheck configurado (API, FB Ads, Agent, Redis, Flower).
-Use `docker compose ps` e `docker compose logs <servico>` para diagnostico.
+
+```bash
+# Producao
+docker service ls | grep marketing
+
+# Desenvolvimento
+docker compose ps
+docker compose logs <servico>
+```
 
 ## Volumes
 
