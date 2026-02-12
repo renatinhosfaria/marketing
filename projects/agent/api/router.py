@@ -1,944 +1,398 @@
 """
-Router da API do Agente de Tráfego Pago.
+Router da API do Agent.
+
+POST /chat: endpoint principal com SSE stream.
+GET /health: healthcheck do servico.
 """
 
-from typing import AsyncGenerator
-from fastapi import APIRouter, Depends, HTTPException, status
+import asyncio
+import time
+
+from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-import json
-import uuid
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langgraph.types import Command
 
-from projects.agent.api.schemas import (
-    ChatRequest,
-    ChatResponse,
-    AnalyzeRequest,
-    AnalyzeResponse,
-    SuggestionsResponse,
-    SuggestionItem,
-    FeedbackRequest,
-    FeedbackResponse,
-    ClearConversationRequest,
-    ClearConversationResponse,
-    ConversationHistoryResponse,
-    ConversationListResponse,
-    ConversationListItem,
-    MessageResponse,
-    AgentStatusResponse,
-    ErrorResponse,
-    # Multi-Agent schemas
-    MultiAgentChatRequest,
-    MultiAgentChatResponse,
-    MultiAgentStatusResponse,
-    AgentInfo,
-    ListAgentsResponse,
-    SubagentInfo,
-    SubagentStatusResponse,
-    SubagentsListResponse,
-    AgentResultDetail,
-    ChatDetailedResponse,
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.store.postgres import AsyncPostgresStore
+
+from projects.agent.api.dependencies import (
+    get_graph,
+    verify_api_key,
+    AuthUser,
+    get_store,
+    get_checkpointer,
 )
-from projects.agent import get_agent_service, get_agent_settings
-from projects.agent.service import get_multi_agent_service
-from projects.agent.subagents import SUBAGENT_REGISTRY
-from shared.db.session import get_db, async_session_maker
-from projects.agent.db.models import AgentConversation, AgentMessage, AgentFeedback, MessageRole
-from shared.core.logging import get_logger
-from sqlalchemy import select, desc, func
-
-
-logger = get_logger(__name__)
-router = APIRouter(prefix="/agent", tags=["Agent"])
-
-
-# ==========================================
-# Chat Endpoints
-# ==========================================
-
-@router.post(
-    "/chat",
-    response_model=ChatResponse,
-    responses={
-        400: {"model": ErrorResponse},
-        500: {"model": ErrorResponse},
-    },
-    summary="Enviar mensagem ao agente",
-    description="Envia uma mensagem ao agente e recebe a resposta completa."
+from projects.agent.api.schemas import ChatRequest, ConversationPreview, ConversationMessages
+from projects.agent.memory.namespaces import StoreNamespace
+from projects.agent.api.stream import sse_event, _safe_json
+from projects.agent.config import agent_settings
+from projects.agent.observability.metrics import (
+    agent_requests_total,
+    agent_response_duration,
+    agent_active_streams,
 )
-async def chat(
-    request: ChatRequest,
-    db: AsyncSession = Depends(get_db),
-):
+
+router = APIRouter()
+
+# Controle de streams concorrentes por usuario via Semaphore
+_stream_semaphores: dict[str, asyncio.Semaphore] = {}
+MAX_STREAMS_PER_USER = 3
+
+
+def _get_semaphore(user_id: str) -> asyncio.Semaphore:
+    """Retorna ou cria o Semaphore para o usuario.
+
+    Thread-safe em single-worker async.
     """
-    Processa uma mensagem do usuário e retorna a resposta do agente.
+    if user_id not in _stream_semaphores:
+        _stream_semaphores[user_id] = asyncio.Semaphore(MAX_STREAMS_PER_USER)
+    return _stream_semaphores[user_id]
+
+
+def _build_thread_id(thread_id: str, user_id: str, account_id: str) -> str:
+    """Garante que thread_id e unico por (user_id, account_id).
+
+    Formato canonico: "{user_id}:{account_id}:{frontend_thread_id}".
+    Se vier um UUID puro do frontend, prefixamos.
+    Se vier prefixado, validamos que user/account conferem.
     """
-    try:
-        agent_service = await get_agent_service()
-
-        result = await agent_service.chat(
-            message=request.message,
-            config_id=request.config_id,
-            user_id=1,
-            thread_id=request.thread_id,
-        )
-
-        # Salvar conversa e mensagens no banco
-        await _save_conversation(
-            db=db,
-            thread_id=result["thread_id"],
-            config_id=request.config_id,
-            user_id=1,
-            user_message=request.message,
-            assistant_message=result.get("response", ""),
-        )
-
-        return ChatResponse(**result)
-
-    except Exception as e:
-        logger.error("Erro no chat", error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-
-
-@router.post(
-    "/chat/stream",
-    summary="Chat com streaming",
-    description="Envia mensagem e recebe resposta em streaming (SSE)."
-)
-async def chat_stream(
-    request: ChatRequest,
-):
-    """
-    Processa uma mensagem com streaming de resposta via Server-Sent Events.
-    Nota: Não usa db dependency para evitar timeout durante streaming longo.
-    """
-    async def generate() -> AsyncGenerator[str, None]:
-        try:
-            agent_service = await get_agent_service()
-            full_response = ""
-            final_thread_id = ""
-
-            async for chunk in agent_service.stream_chat(
-                message=request.message,
-                config_id=request.config_id,
-                user_id=1,
-                thread_id=request.thread_id,
-            ):
-                # Acumular resposta para salvar depois
-                if chunk.get("type") == "text":
-                    full_response += chunk.get("content", "")
-
-                # Capturar thread_id
-                if chunk.get("thread_id"):
-                    final_thread_id = chunk.get("thread_id")
-
-                # Enviar como SSE
-                yield f"data: {json.dumps(chunk)}\n\n"
-
-            # Salvar conversa após streaming completo usando sessão nova
-            if full_response and final_thread_id:
-                try:
-                    async with async_session_maker() as db:
-                        await _save_conversation(
-                            db=db,
-                            thread_id=final_thread_id,
-                            config_id=request.config_id,
-                            user_id=1,
-                            user_message=request.message,
-                            assistant_message=full_response,
-                        )
-                except Exception as save_error:
-                    logger.error("Erro ao salvar conversa", error=str(save_error))
-
-        except Exception as e:
-            logger.error("Erro no streaming", error=str(e))
-            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        }
-    )
-
-
-# ==========================================
-# Analysis & Suggestions
-# ==========================================
-
-@router.post(
-    "/analyze",
-    response_model=AnalyzeResponse,
-    responses={
-        400: {"model": ErrorResponse},
-        500: {"model": ErrorResponse},
-    },
-    summary="Análise rápida",
-    description="Executa uma análise rápida sem persistir a conversa."
-)
-async def analyze(
-    request: AnalyzeRequest,
-):
-    """
-    Executa uma análise rápida usando o agente sem salvar conversa.
-    """
-    try:
-        agent_service = await get_agent_service()
-
-        result = await agent_service.chat(
-            message=request.query,
-            config_id=request.config_id,
-            user_id=1,
-            thread_id=None,
-        )
-
-        thread_id = result.get("thread_id")
-        if thread_id:
-            await agent_service.clear_conversation(thread_id)
-
-        return AnalyzeResponse(
-            success=result.get("success", False),
-            response=result.get("response", ""),
-            intent=result.get("intent"),
-            tool_calls_count=result.get("tool_calls_count", 0),
-            error=result.get("error"),
-        )
-
-    except Exception as e:
-        logger.error("Erro no analyze", error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-
-
-@router.get(
-    "/suggestions/{config_id}",
-    response_model=SuggestionsResponse,
-    summary="Sugestões proativas",
-    description="Retorna uma lista de sugestões de perguntas para o agente."
-)
-async def get_suggestions(
-    config_id: int,
-):
-    """
-    Retorna sugestões de perguntas para o usuário.
-    """
-    suggestions = [
-        SuggestionItem(
-            id="best_cpl",
-            text="Qual campanha está com o melhor CPL?",
-            category="performance",
-            priority=5,
-        ),
-        SuggestionItem(
-            id="critical_anomalies",
-            text="Mostre anomalias críticas de hoje",
-            category="anomalies",
-            priority=4,
-        ),
-        SuggestionItem(
-            id="recommendations",
-            text="Quais recomendações devo seguir?",
-            category="recommendations",
-            priority=4,
-        ),
-        SuggestionItem(
-            id="compare_top_campaigns",
-            text="Compare minhas top 3 campanhas",
-            category="comparison",
-            priority=3,
-        ),
-        SuggestionItem(
-            id="forecast_leads",
-            text="Previsão de leads para próxima semana",
-            category="forecast",
-            priority=3,
-        ),
-        SuggestionItem(
-            id="pause_campaigns",
-            text="Qual campanha devo pausar?",
-            category="actions",
-            priority=3,
-        ),
-    ]
-
-    return SuggestionsResponse(
-        config_id=config_id,
-        suggestions=suggestions,
-    )
-
-
-# ==========================================
-# Conversation Endpoints
-# ==========================================
-
-@router.get(
-    "/conversations",
-    response_model=ConversationListResponse,
-    summary="Listar conversas",
-    description="Lista todas as conversas do usuário para uma configuração."
-)
-async def list_conversations(
-    config_id: int,
-    limit: int = 20,
-    offset: int = 0,
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Lista conversas do usuário ordenadas por data de atualização.
-    """
-    try:
-        # Contar total
-        count_query = select(func.count()).select_from(AgentConversation).where(
-            AgentConversation.user_id == 1,
-            AgentConversation.config_id == config_id,
-        )
-        total_result = await db.execute(count_query)
-        total = total_result.scalar() or 0
-
-        # Buscar conversas
-        query = (
-            select(AgentConversation)
-            .where(
-                AgentConversation.user_id == 1,
-                AgentConversation.config_id == config_id,
-            )
-            .order_by(desc(AgentConversation.updated_at))
-            .offset(offset)
-            .limit(limit)
-        )
-
-        result = await db.execute(query)
-        conversations = result.scalars().all()
-
-        return ConversationListResponse(
-            conversations=[
-                ConversationListItem(
-                    thread_id=c.thread_id,
-                    title=c.title,
-                    message_count=c.message_count,
-                    created_at=c.created_at,
-                    updated_at=c.updated_at,
-                )
-                for c in conversations
-            ],
-            total=total
-        )
-
-    except Exception as e:
-        logger.error("Erro ao listar conversas", error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-
-
-@router.get(
-    "/conversations/{thread_id}",
-    response_model=ConversationHistoryResponse,
-    summary="Obter histórico da conversa",
-    description="Retorna todas as mensagens de uma conversa."
-)
-async def get_conversation_history(
-    thread_id: str,
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Retorna o histórico completo de uma conversa.
-    """
-    try:
-        # Verificar se a conversa pertence ao usuário
-        conv_query = select(AgentConversation).where(
-            AgentConversation.thread_id == thread_id,
-            AgentConversation.user_id == 1,
-        )
-        conv_result = await db.execute(conv_query)
-        conversation = conv_result.scalar_one_or_none()
-
-        if not conversation:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Conversa não encontrada"
-            )
-
-        # Buscar mensagens
-        msg_query = (
-            select(AgentMessage)
-            .where(AgentMessage.conversation_id == conversation.id)
-            .order_by(AgentMessage.created_at)
-        )
-        msg_result = await db.execute(msg_query)
-        messages = msg_result.scalars().all()
-
-        return ConversationHistoryResponse(
-            thread_id=thread_id,
-            messages=[
-                MessageResponse(
-                    role=m.role.value,
-                    content=m.content,
-                    created_at=m.created_at,
-                )
-                for m in messages
-            ],
-            message_count=len(messages),
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Erro ao obter histórico", error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-
-
-@router.delete(
-    "/conversations/{thread_id}",
-    response_model=ClearConversationResponse,
-    summary="Limpar conversa",
-    description="Remove todo o histórico de uma conversa."
-)
-async def clear_conversation(
-    thread_id: str,
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Limpa o histórico de uma conversa.
-    """
-    try:
-        # Verificar se a conversa pertence ao usuário
-        conv_query = select(AgentConversation).where(
-            AgentConversation.thread_id == thread_id,
-            AgentConversation.user_id == 1,
-        )
-        conv_result = await db.execute(conv_query)
-        conversation = conv_result.scalar_one_or_none()
-
-        if not conversation:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Conversa não encontrada"
-            )
-
-        # Deletar conversa (cascade deleta mensagens)
-        await db.delete(conversation)
-        await db.commit()
-
-        # Limpar checkpoints do agente
-        agent_service = await get_agent_service()
-        await agent_service.clear_conversation(thread_id)
-
-        return ClearConversationResponse(
-            success=True,
-            message="Conversa limpa com sucesso"
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Erro ao limpar conversa", error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-
-
-# ==========================================
-# Feedback Endpoints
-# ==========================================
-
-@router.post(
-    "/feedback",
-    response_model=FeedbackResponse,
-    summary="Enviar feedback",
-    description="Envia feedback sobre uma resposta do agente."
-)
-async def submit_feedback(
-    request: FeedbackRequest,
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Registra feedback do usuário sobre uma resposta.
-    """
-    try:
-        # Verificar se a mensagem existe e pertence ao usuário
-        msg_query = (
-            select(AgentMessage)
-            .join(AgentConversation)
-            .where(
-                AgentMessage.id == request.message_id,
-                AgentConversation.user_id == 1,
-            )
-        )
-        msg_result = await db.execute(msg_query)
-        message = msg_result.scalar_one_or_none()
-
-        if not message:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Mensagem não encontrada"
-            )
-
-        # Criar ou atualizar feedback
-        feedback = AgentFeedback(
-            message_id=request.message_id,
-            user_id=1,
-            rating=request.rating,
-            feedback_text=request.feedback_text,
-        )
-
-        db.add(feedback)
-        await db.commit()
-
-        return FeedbackResponse(
-            success=True,
-            message="Feedback registrado com sucesso"
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error("Erro ao registrar feedback", error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-
-
-# ==========================================
-# Status Endpoints
-# ==========================================
-
-@router.get(
-    "/status",
-    response_model=AgentStatusResponse,
-    summary="Status do agente",
-    description="Retorna o status atual do agente."
-)
-async def get_agent_status():
-    """
-    Retorna informações de status do agente.
-    """
-    try:
-        settings = get_agent_settings()
-
-        return AgentStatusResponse(
-            status="online",
-            llm_provider=settings.llm_provider,
-            model=settings.llm_model,
-            version="1.0.0",
-        )
-
-    except Exception as e:
-        logger.error("Erro ao obter status", error=str(e))
-        return AgentStatusResponse(
-            status="error",
-            llm_provider="unknown",
-            model="unknown",
-            version="1.0.0",
-        )
-
-
-# ==========================================
-# Multi-Agent Endpoints
-# ==========================================
-
-@router.post(
-    "/multi-agent/chat",
-    response_model=MultiAgentChatResponse,
-    responses={
-        400: {"model": ErrorResponse},
-        500: {"model": ErrorResponse},
-    },
-    summary="Chat com sistema multi-agente",
-    description="Envia mensagem usando o sistema multi-agente orquestrado."
-)
-async def chat_multi_agent(
-    request: MultiAgentChatRequest,
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    Processa mensagem usando múltiplos agentes especializados.
-
-    O sistema multi-agente utiliza um orquestrador que coordena vários
-    subagentes especializados para fornecer respostas mais completas.
-
-    Subagentes disponíveis:
-    - classification: Análise de tiers de performance
-    - anomaly: Detecção de problemas e alertas
-    - forecast: Previsões de CPL/Leads
-    - recommendation: Recomendações de ações
-    - campaign: Dados de campanhas
-    - analysis: Análises avançadas
-    """
-    try:
-        multi_agent_service = await get_multi_agent_service()
-
-        result = await multi_agent_service.chat_multi_agent(
-            message=request.message,
-            config_id=request.config_id,
-            user_id=1,
-            thread_id=request.thread_id,
-        )
-
-        # Salvar conversa e mensagens no banco
-        await _save_conversation(
-            db=db,
-            thread_id=result["thread_id"],
-            config_id=request.config_id,
-            user_id=1,
-            user_message=request.message,
-            assistant_message=result.get("response", ""),
-        )
-
-        return MultiAgentChatResponse(
-            success=result.get("success", False),
-            thread_id=result.get("thread_id", ""),
-            response=result.get("response", ""),
-            confidence_score=result.get("confidence_score", 0.0),
-            intent=result.get("intent"),
-            agents_used=result.get("agents_used", []),
-            agent_results=result.get("agent_results", {}),
-            error=result.get("error"),
-        )
-
-    except Exception as e:
-        logger.error("Erro no chat multi-agente", error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-
-
-@router.post(
-    "/multi-agent/chat/stream",
-    summary="Chat multi-agente com streaming",
-    description="Envia mensagem e recebe eventos em streaming (SSE) usando sistema multi-agente."
-)
-async def chat_multi_agent_stream(
-    request: MultiAgentChatRequest,
-):
-    """
-    Processa mensagem com streaming usando sistema multi-agente.
-
-    Emite eventos SSE para acompanhamento em tempo real:
-    - orchestrator_start: Início do processamento
-    - intent_detected: Quando a intenção é identificada
-    - plan_created: Quando o plano de execução é criado
-    - agent_start: Quando um subagente começa
-    - agent_end: Quando um subagente termina
-    - synthesis_start: Início da síntese
-    - text: Chunks da resposta sintetizada
-    - done: Finalização com metadados
-    - error: Em caso de erro
-    """
-    async def generate() -> AsyncGenerator[str, None]:
-        try:
-            multi_agent_service = await get_multi_agent_service()
-            full_response = ""
-            final_thread_id = ""
-
-            async for event in multi_agent_service.stream_chat_multi_agent(
-                message=request.message,
-                config_id=request.config_id,
-                user_id=1,
-                thread_id=request.thread_id,
-            ):
-                # Acumular resposta para salvar depois
-                if event.get("type") == "text":
-                    full_response += event.get("content", "")
-
-                # Capturar thread_id
-                if event.get("thread_id"):
-                    final_thread_id = event.get("thread_id")
-
-                # Enviar como SSE
-                yield f"data: {json.dumps(event)}\n\n"
-
-            # Salvar conversa após streaming completo usando sessão nova
-            if full_response and final_thread_id:
-                try:
-                    async with async_session_maker() as db:
-                        await _save_conversation(
-                            db=db,
-                            thread_id=final_thread_id,
-                            config_id=request.config_id,
-                            user_id=1,
-                            user_message=request.message,
-                            assistant_message=full_response,
-                        )
-                except Exception as save_error:
-                    logger.error("Erro ao salvar conversa multi-agente", error=str(save_error))
-
-        except Exception as e:
-            logger.error("Erro no streaming multi-agente", error=str(e))
-            yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        }
-    )
-
-
-@router.get(
-    "/multi-agent/status",
-    response_model=MultiAgentStatusResponse,
-    summary="Status do sistema multi-agente",
-    description="Retorna status e agentes disponíveis do sistema multi-agente."
-)
-async def get_multi_agent_status():
-    """
-    Retorna informações do sistema multi-agente.
-
-    Inclui:
-    - Status de operação (online/offline/error)
-    - Modo atual (multi)
-    - Lista de subagentes disponíveis
-    - Versão do sistema
-    """
-    try:
-        # Lista de agentes disponíveis do registry
-        available_agents = list(SUBAGENT_REGISTRY.keys())
-
-        return MultiAgentStatusResponse(
-            status="online",
-            mode="multi",
-            available_agents=available_agents,
-            version="1.0.0",
-        )
-
-    except Exception as e:
-        logger.error("Erro ao obter status multi-agente", error=str(e))
-        return MultiAgentStatusResponse(
-            status="error",
-            mode="multi",
-            available_agents=[],
-            version="1.0.0",
-        )
-
-
-@router.get(
-    "/multi-agent/agents",
-    response_model=ListAgentsResponse,
-    summary="Lista de subagentes",
-    description="Retorna lista detalhada de subagentes disponíveis com descrições."
-)
-async def list_available_agents():
-    """
-    Lista todos os subagentes disponíveis com suas descrições.
-
-    Cada subagente tem:
-    - name: Nome identificador único
-    - description: Descrição das capacidades
-    - timeout: Timeout de execução em segundos
-    """
-    try:
-        agents_info = []
-
-        for name, agent_cls in SUBAGENT_REGISTRY.items():
-            # Instanciar para obter descrição e timeout
-            agent_instance = agent_cls()
-
-            agents_info.append(AgentInfo(
-                name=name,
-                description=getattr(agent_instance, "AGENT_DESCRIPTION", "Sem descrição"),
-                timeout=agent_instance.get_timeout(),
-            ))
-
-        return ListAgentsResponse(
-            total=len(agents_info),
-            agents=agents_info,
-        )
-
-    except Exception as e:
-        logger.error("Erro ao listar agentes", error=str(e))
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
-
-
-# ==========================================
-# Subagent Endpoints
-# ==========================================
-
-@router.get("/subagents", response_model=SubagentsListResponse)
-async def list_subagents():
-    """Lista todos os subagentes disponíveis."""
-    from projects.agent.subagents import SUBAGENT_REGISTRY
-    from projects.agent.config import get_agent_settings
-
-    settings = get_agent_settings()
-
-    subagents = []
-    for name, cls in SUBAGENT_REGISTRY.items():
-        agent = cls()
-        subagents.append(SubagentInfo(
-            name=name,
-            description=agent.AGENT_DESCRIPTION,
-            tools_count=len(agent.get_tools()),
-            timeout=agent.get_timeout()
-        ))
-
-    return SubagentsListResponse(
-        subagents=subagents,
-        total=len(subagents),
-        multi_agent_enabled=settings.multi_agent_enabled
-    )
-
-
-@router.get("/subagents/{name}/status", response_model=SubagentStatusResponse)
-async def get_subagent_status(
-    name: str,
-):
-    """Retorna status de um subagente específico."""
-    from projects.agent.subagents import SUBAGENT_REGISTRY
-
-    if name not in SUBAGENT_REGISTRY:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Subagente '{name}' não encontrado"
-        )
-
-    return SubagentStatusResponse(
-        name=name,
-        status="ready",
-        last_execution_ms=None,
-        total_executions=0,
-        success_rate=1.0
-    )
-
-
-@router.post("/chat/detailed", response_model=ChatDetailedResponse)
-async def chat_detailed(
-    request: ChatRequest,
-    db: AsyncSession = Depends(get_db),
-):
-    """Chat com resposta detalhada incluindo info de subagentes."""
-    from projects.agent.service import get_agent_service, should_use_multiagent
-    import time
-
-    if not should_use_multiagent():
+    prefix = f"{user_id}:{account_id}:"
+    if thread_id.startswith(prefix):
+        return thread_id  # Ja prefixado corretamente
+
+    # Se vier com prefixo de outro tenant, bloqueia
+    parts = thread_id.split(":", 2)
+    if len(parts) == 3 and (parts[0] != str(user_id) or parts[1] != account_id):
         raise HTTPException(
             status_code=400,
-            detail="Multi-agent system não está habilitado"
+            detail="thread_id pertence a outro tenant.",
         )
 
-    start_time = time.time()
-
-    try:
-        service = await get_agent_service()
-        result = await service._chat_multiagent(
-            message=request.message,
-            config_id=request.config_id,
-            user_id=1,
-            thread_id=request.thread_id or str(uuid.uuid4()),
-            db=db
-        )
-
-        duration_ms = int((time.time() - start_time) * 1000)
-
-        # Formatar resultados dos agentes
-        agent_details = []
-        for name, res in result.get("agent_results", {}).items():
-            if isinstance(res, dict):
-                agent_details.append(AgentResultDetail(
-                    agent_name=name,
-                    success=res.get("success", False),
-                    duration_ms=res.get("duration_ms", 0),
-                    tool_calls=res.get("tool_calls", []),
-                    error=res.get("error")
-                ))
-
-        return ChatDetailedResponse(
-            success=True,
-            thread_id=result.get("thread_id", ""),
-            response=result.get("response", ""),
-            intent=result.get("intent", "general"),
-            confidence_score=result.get("confidence", 0.0),
-            agent_results=agent_details,
-            total_duration_ms=duration_ms
-        )
-
-    except Exception as e:
-        logger.error("Erro no chat detailed", error=str(e))
-        raise HTTPException(
-            status_code=500,
-            detail=str(e)
-        )
+    return f"{prefix}{thread_id}"
 
 
-# ==========================================
-# Helper Functions
-# ==========================================
-
-async def _save_conversation(
-    db: AsyncSession,
-    thread_id: str,
-    config_id: int,
-    user_id: int,
-    user_message: str,
-    assistant_message: str,
+@router.post("/chat")
+async def chat_stream(
+    request: Request,
+    body: ChatRequest,
+    user: AuthUser = Depends(verify_api_key),
+    graph=Depends(get_graph),
 ):
+    """Endpoint principal de chat. Retorna SSE stream com autenticacao.
+
+    Suporta:
+    - Envio de mensagem nova (body.message)
+    - Retomada apos interrupt (body.resume_payload)
     """
-    Salva ou atualiza conversa e mensagens no banco.
-    """
+    semaphore = _get_semaphore(str(user.user_id))
+    if semaphore.locked():
+        raise HTTPException(429, "Limite de streams concorrentes atingido.")
+
+    # thread_id prefixado para isolamento multi-tenant
+    safe_thread_id = _build_thread_id(
+        body.thread_id, str(user.user_id), body.account_id,
+    )
+    config = {
+        "configurable": {
+            "thread_id": safe_thread_id,
+            "user_id": str(user.user_id),
+            "account_id": body.account_id,
+        }
+    }
+
+    # Determina input: nova mensagem ou resume de interrupt
+    if body.resume_payload:
+        input_data = Command(resume=body.resume_payload.model_dump())
+    else:
+        if not body.message:
+            raise HTTPException(400, "message e obrigatorio quando nao e resume.")
+        input_data = {
+            "messages": [HumanMessage(content=body.message)],
+            "user_context": {
+                "user_id": str(user.user_id),
+                "account_id": body.account_id,
+                "account_name": "",
+                "timezone": "America/Sao_Paulo",
+            },
+        }
+
+    async def event_generator():
+        async with semaphore:
+            agent_active_streams.inc()
+            stream_start = time.monotonic()
+            keepalive_interval = agent_settings.sse_keepalive_interval
+            queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=100)
+
+            async def stream_graph():
+                """Roda o grafo e coloca eventos na queue."""
+                try:
+                    async for namespace, mode, chunk in graph.astream(
+                        input_data,
+                        config=config,
+                        stream_mode=["messages", "updates", "custom"],
+                        subgraphs=True,
+                    ):
+                        agent_source = namespace[-1] if namespace else "supervisor"
+
+                        if mode == "messages":
+                            msg_chunk, metadata = chunk
+                            node = metadata.get(
+                                "langgraph_node", "",
+                            )
+
+                            # Tool results de qualquer agente (Generative UI)
+                            if (
+                                isinstance(msg_chunk, ToolMessage)
+                                and msg_chunk.name
+                            ):
+                                await queue.put(sse_event("tool_result", {
+                                    "tool": msg_chunk.name,
+                                    "data": _safe_json(msg_chunk.content),
+                                    "agent": metadata.get(
+                                        "langgraph_node", "unknown",
+                                    ),
+                                }))
+
+                            # Texto: apenas o synthesizer streama ao usuario.
+                            # Supervisor usa structured output (JSON interno).
+                            # Agentes especialistas contribuem via agent_reports
+                            # que o synthesizer consolida em resposta unica.
+                            if node == "synthesizer" and msg_chunk.content:
+                                await queue.put(sse_event("message", {
+                                    "content": msg_chunk.content,
+                                    "agent": "synthesizer",
+                                }))
+
+                        elif mode == "updates":
+                            if "__interrupt__" in chunk:
+                                interrupt_data = chunk["__interrupt__"][0].value
+                                await queue.put(sse_event("interrupt", {
+                                    "type": interrupt_data["type"],
+                                    "approval_token": interrupt_data[
+                                        "approval_token"
+                                    ],
+                                    "details": interrupt_data["details"],
+                                    "thread_id": body.thread_id,
+                                }))
+                            else:
+                                for node_name, node_output in chunk.items():
+                                    # Supervisor pode retornar AIMessage direta
+                                    # (fallback sem agentes / limite de steps).
+                                    # Como filtramos "messages" mode do supervisor,
+                                    # precisamos capturar respostas textuais aqui.
+                                    if (
+                                        node_name == "supervisor"
+                                        and isinstance(node_output, dict)
+                                    ):
+                                        for msg in node_output.get("messages", []):
+                                            if (
+                                                isinstance(msg, AIMessage)
+                                                and msg.content
+                                            ):
+                                                await queue.put(sse_event(
+                                                    "message",
+                                                    {
+                                                        "content": msg.content,
+                                                        "agent": "supervisor",
+                                                    },
+                                                ))
+                                    await queue.put(sse_event("agent_status", {
+                                        "agent": node_name,
+                                        "source": agent_source,
+                                        "status": "completed",
+                                    }))
+
+                        elif mode == "custom":
+                            await queue.put(sse_event("agent_progress", {
+                                "agent": agent_source,
+                                **chunk,
+                            }))
+
+                    await queue.put(sse_event("done", {
+                        "thread_id": body.thread_id,
+                    }))
+                except asyncio.CancelledError:
+                    await queue.put(sse_event("done", {
+                        "thread_id": body.thread_id,
+                        "reason": "client_disconnected",
+                    }))
+                finally:
+                    await queue.put(None)  # Sentinel: fim do stream
+
+            # Inicia o grafo como task
+            graph_task = asyncio.create_task(stream_graph())
+
+            try:
+                while True:
+                    # Verifica disconnect do cliente
+                    if await request.is_disconnected():
+                        graph_task.cancel()
+                        break
+
+                    try:
+                        event = await asyncio.wait_for(
+                            queue.get(), timeout=keepalive_interval,
+                        )
+                    except asyncio.TimeoutError:
+                        yield ": keepalive\n\n"
+                        continue
+
+                    if event is None:  # Sentinel
+                        break
+
+                    yield event
+            finally:
+                agent_active_streams.dec()
+                elapsed = time.monotonic() - stream_start
+                agent_response_duration.labels(routing_urgency="default").observe(elapsed)
+                agent_requests_total.labels(endpoint="/chat", status="ok").inc()
+                if not graph_task.done():
+                    graph_task.cancel()
+                    try:
+                        await graph_task
+                    except asyncio.CancelledError:
+                        pass
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get("/conversations")
+async def list_conversations(
+    account_id: str,
+    user: AuthUser = Depends(verify_api_key),
+    checkpointer: AsyncPostgresSaver = Depends(get_checkpointer),
+    store: AsyncPostgresStore = Depends(get_store),
+):
+    """Lista conversas do usuario para uma conta."""
+    prefix = f"{user.user_id}:{account_id}:"
+
+    # Query the checkpoints table directly via the pool
+    async with checkpointer.conn.connection() as conn:
+        rows = await conn.execute(
+            """
+            SELECT thread_id,
+                   MIN(created_at) AS created_at,
+                   MAX(created_at) AS last_message_at
+            FROM checkpoints
+            WHERE thread_id LIKE %s
+              AND checkpoint_ns = ''
+            GROUP BY thread_id
+            ORDER BY MAX(created_at) DESC
+            LIMIT 50
+            """,
+            (f"{prefix}%",),
+        )
+        threads = await rows.fetchall()
+
+    if not threads:
+        return {"conversations": []}
+
+    # Fetch titles from store
+    ns = StoreNamespace.conversation_titles(str(user.user_id), account_id)
+    title_items = await store.asearch(ns)
+
+    titles = {}
+    if title_items:
+        for item in title_items:
+            titles[item.key] = item.value.get("title", "Nova conversa")
+
+    conversations = []
+    for row in threads:
+        full_thread_id = row["thread_id"]
+        frontend_id = full_thread_id.removeprefix(prefix)
+        conversations.append(ConversationPreview(
+            thread_id=frontend_id,
+            title=titles.get(frontend_id, "Nova conversa"),
+            created_at=row["created_at"],
+            last_message_at=row["last_message_at"],
+        ))
+
+    return {"conversations": conversations}
+
+
+@router.get("/conversations/{thread_id}/messages")
+async def get_conversation_messages(
+    thread_id: str,
+    account_id: str,
+    user: AuthUser = Depends(verify_api_key),
+    checkpointer: AsyncPostgresSaver = Depends(get_checkpointer),
+):
+    """Retorna mensagens de uma conversa."""
+    safe_thread_id = _build_thread_id(thread_id, str(user.user_id), account_id)
+    config = {"configurable": {"thread_id": safe_thread_id}}
+
+    checkpoint_tuple = await checkpointer.aget_tuple(config)
+    if not checkpoint_tuple:
+        raise HTTPException(404, "Conversa nao encontrada.")
+
+    state = checkpoint_tuple.checkpoint
+    channel_values = state.get("channel_values", {})
+    raw_messages = channel_values.get("messages", [])
+
+    messages = []
+    for msg in raw_messages:
+        if isinstance(msg, HumanMessage):
+            messages.append({
+                "role": "user",
+                "content": msg.content,
+            })
+        elif isinstance(msg, AIMessage) and msg.content:
+            messages.append({
+                "role": "assistant",
+                "content": msg.content,
+            })
+
+    return ConversationMessages(thread_id=thread_id, messages=messages)
+
+
+@router.delete("/conversations/{thread_id}")
+async def delete_conversation(
+    thread_id: str,
+    account_id: str,
+    user: AuthUser = Depends(verify_api_key),
+    checkpointer: AsyncPostgresSaver = Depends(get_checkpointer),
+    store: AsyncPostgresStore = Depends(get_store),
+):
+    """Deleta uma conversa (checkpoints + titulo)."""
+    safe_thread_id = _build_thread_id(thread_id, str(user.user_id), account_id)
+
+    async with checkpointer.conn.connection() as conn:
+        await conn.execute(
+            "DELETE FROM checkpoint_writes WHERE thread_id = %s",
+            (safe_thread_id,),
+        )
+        await conn.execute(
+            "DELETE FROM checkpoint_blobs WHERE thread_id = %s",
+            (safe_thread_id,),
+        )
+        await conn.execute(
+            "DELETE FROM checkpoints WHERE thread_id = %s",
+            (safe_thread_id,),
+        )
+
+    # Delete title from store
+    ns = StoreNamespace.conversation_titles(str(user.user_id), account_id)
     try:
-        # Buscar ou criar conversa
-        conv_query = select(AgentConversation).where(
-            AgentConversation.thread_id == thread_id
-        )
-        conv_result = await db.execute(conv_query)
-        conversation = conv_result.scalar_one_or_none()
+        await store.adelete(ns, thread_id)
+    except Exception:
+        pass  # Title may not exist yet
 
-        if not conversation:
-            # Criar nova conversa
-            # Usar primeiras palavras da mensagem como título
-            title = user_message[:50] + "..." if len(user_message) > 50 else user_message
+    return {"status": "deleted", "thread_id": thread_id}
 
-            conversation = AgentConversation(
-                thread_id=thread_id,
-                config_id=config_id,
-                user_id=user_id,
-                title=title,
-                message_count=0,
-            )
-            db.add(conversation)
-            await db.flush()
 
-        # Adicionar mensagem do usuário
-        user_msg = AgentMessage(
-            conversation_id=conversation.id,
-            role=MessageRole.USER,
-            content=user_message,
-        )
-        db.add(user_msg)
-
-        # Adicionar mensagem do assistente
-        assistant_msg = AgentMessage(
-            conversation_id=conversation.id,
-            role=MessageRole.ASSISTANT,
-            content=assistant_message,
-        )
-        db.add(assistant_msg)
-
-        # Atualizar contador
-        conversation.message_count += 2
-
-        await db.commit()
-
-    except Exception as e:
-        logger.error("Erro ao salvar conversa", error=str(e))
-        await db.rollback()
+@router.get("/health")
+async def health():
+    """Healthcheck do servico Agent API."""
+    return {
+        "status": "healthy",
+        "service": "famachat-agent-api",
+        "version": agent_settings.agent_version,
+    }
