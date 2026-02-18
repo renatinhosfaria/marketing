@@ -26,6 +26,10 @@ def setup_logging(log_level: str = "INFO") -> None:
         level=numeric_level,
     )
 
+    # Suprimir logs verbosos de bibliotecas HTTP (connect_tcp, start_tls, etc.)
+    for noisy_logger in ("httpx", "httpcore", "httpcore.http11", "httpcore.connection"):
+        logging.getLogger(noisy_logger).setLevel(logging.WARNING)
+
     # Configurar structlog
     structlog.configure(
         processors=[

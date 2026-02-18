@@ -1,158 +1,68 @@
 """
-Configuração do checkpointer PostgreSQL para persistência de estado do agente.
+Factory do AsyncPostgresSaver (checkpointer).
+
+create_checkpointer_cm(): retorna async context manager do checkpointer.
+O lifespan do FastAPI gerencia o ciclo de vida (open/close).
+
+Usa AsyncConnectionPool (psycopg_pool) para resiliencia contra
+conexoes mortas — pool reconecta automaticamente.
 """
 
-from typing import Optional
 from contextlib import asynccontextmanager
+from typing import AsyncIterator
 
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg_pool import AsyncConnectionPool
+from psycopg.rows import dict_row
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from shared.config import settings
-from shared.core.logging import get_logger
 
+import structlog
 
-logger = get_logger(__name__)
-
-
-class AgentCheckpointer:
-    """
-    Gerenciador do checkpointer PostgreSQL para o agente LangGraph.
-
-    Usa connection pool para eficiência em produção.
-    """
-
-    _instance: Optional["AgentCheckpointer"] = None
-    _pool: Optional[AsyncConnectionPool] = None
-    _checkpointer: Optional[AsyncPostgresSaver] = None
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
-    @classmethod
-    async def initialize(cls) -> "AgentCheckpointer":
-        """
-        Inicializa o checkpointer com connection pool.
-
-        Returns:
-            Instância do AgentCheckpointer
-        """
-        instance = cls()
-
-        if instance._pool is None:
-            # Converter URL para formato psycopg3
-            database_url = settings.database_url
-            if database_url.startswith("postgresql+asyncpg://"):
-                database_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
-
-            # Criar pool de conexões
-            instance._pool = AsyncConnectionPool(
-                conninfo=database_url,
-                min_size=2,
-                max_size=10,
-                open=False
-            )
-            await instance._pool.open()
-
-            logger.info("Pool de conexões do checkpointer inicializado")
-
-        if instance._checkpointer is None:
-            instance._checkpointer = AsyncPostgresSaver(instance._pool)
-            await instance._checkpointer.setup()
-
-            logger.info("Checkpointer PostgreSQL configurado")
-
-        return instance
-
-    @classmethod
-    async def get_checkpointer(cls) -> AsyncPostgresSaver:
-        """
-        Obtém o checkpointer inicializado.
-
-        Returns:
-            AsyncPostgresSaver pronto para uso
-        """
-        instance = await cls.initialize()
-
-        if instance._checkpointer is None:
-            raise RuntimeError("Checkpointer não inicializado")
-
-        return instance._checkpointer
-
-    @classmethod
-    async def close(cls):
-        """
-        Fecha o pool de conexões.
-        """
-        instance = cls()
-
-        if instance._pool is not None:
-            await instance._pool.close()
-            instance._pool = None
-            instance._checkpointer = None
-
-            logger.info("Pool de conexões do checkpointer fechado")
+logger = structlog.get_logger()
 
 
 @asynccontextmanager
-async def get_agent_checkpointer():
-    """
-    Context manager para obter o checkpointer.
+async def create_checkpointer_cm() -> AsyncIterator[AsyncPostgresSaver]:
+    """Context manager que cria e gerencia o AsyncPostgresSaver.
 
-    Uso:
-        async with get_agent_checkpointer() as checkpointer:
-            agent = graph.compile(checkpointer=checkpointer)
+    Usa pool de conexoes (min=1, max=3) ao inves de conexao unica.
+    Isso evita o erro 'the connection is closed' quando a conexao
+    fica idle por muito tempo e o PostgreSQL a fecha.
     """
-    checkpointer = await AgentCheckpointer.get_checkpointer()
+    logger.info("checkpointer.init_start")
+
+    pool = AsyncConnectionPool(
+        conninfo=settings.database_url,
+        min_size=1,
+        max_size=3,
+        check=AsyncConnectionPool.check_connection,
+        max_idle=300,
+        kwargs={
+            "autocommit": True,
+            "prepare_threshold": 0,
+            "row_factory": dict_row,
+            "keepalives": 1,
+            "keepalives_idle": 30,
+            "keepalives_interval": 10,
+            "keepalives_count": 5,
+        },
+    )
+    await pool.open()
+
     try:
+        checkpointer = AsyncPostgresSaver(conn=pool)
+        await checkpointer.setup()
+
+        # Adicionar coluna created_at que o LangGraph nao cria por padrao.
+        # Necessaria para listar conversas ordenadas por data.
+        async with pool.connection() as conn:
+            await conn.execute(
+                "ALTER TABLE checkpoints "
+                "ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now()"
+            )
+
+        logger.info("checkpointer.init_complete", pool_min=1, pool_max=3)
         yield checkpointer
     finally:
-        # O pool é gerenciado globalmente, não fechamos aqui
-        pass
-
-
-async def setup_checkpointer_tables():
-    """
-    Configura as tabelas do checkpointer no banco.
-
-    Deve ser chamado durante a inicialização da aplicação.
-    """
-    try:
-        checkpointer = await AgentCheckpointer.get_checkpointer()
-        await checkpointer.setup()
-        logger.info("Tabelas do checkpointer configuradas")
-    except Exception as e:
-        logger.error("Erro ao configurar tabelas do checkpointer", error=str(e))
-        raise
-
-
-async def cleanup_old_checkpoints(days: int = 30):
-    """
-    Remove checkpoints antigos para liberar espaço.
-
-    Args:
-        days: Número de dias para manter
-    """
-    try:
-        checkpointer = await AgentCheckpointer.get_checkpointer()
-
-        # Query para remover checkpoints antigos
-        async with checkpointer._pool.connection() as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(
-                    """
-                    DELETE FROM agent_checkpoints
-                    WHERE thread_ts < NOW() - INTERVAL '%s days'
-                    """,
-                    (days,)
-                )
-
-                deleted = cur.rowcount
-                await conn.commit()
-
-                logger.info("Removidos {deleted} checkpoints com mais de {days} dias")
-
-    except Exception as e:
-        logger.error("Erro ao limpar checkpoints antigos", error=str(e))
+        await pool.close()

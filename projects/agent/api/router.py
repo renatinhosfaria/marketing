@@ -227,6 +227,17 @@ async def chat_stream(
                         "thread_id": body.thread_id,
                         "reason": "client_disconnected",
                     }))
+                except Exception as exc:
+                    logger.error(
+                        "stream.graph_error",
+                        error=str(exc),
+                        error_type=type(exc).__name__,
+                        thread_id=safe_thread_id,
+                    )
+                    await queue.put(sse_event("error", {
+                        "message": "Erro interno ao processar sua mensagem. Tente novamente.",
+                        "thread_id": body.thread_id,
+                    }))
                 finally:
                     await queue.put(None)  # Sentinel: fim do stream
 
@@ -256,7 +267,8 @@ async def chat_stream(
                 agent_active_streams.dec()
                 elapsed = time.monotonic() - stream_start
                 agent_response_duration.labels(routing_urgency="default").observe(elapsed)
-                agent_requests_total.labels(endpoint="/chat", status="ok").inc()
+                status = "error" if graph_task.done() and graph_task.exception() else "ok"
+                agent_requests_total.labels(endpoint="/chat", status=status).inc()
                 if not graph_task.done():
                     graph_task.cancel()
                     try:
@@ -305,14 +317,16 @@ async def list_conversations(
     if not threads:
         return {"conversations": []}
 
-    # Fetch titles from store
-    ns = StoreNamespace.conversation_titles(str(user.user_id), account_id)
-    title_items = await store.asearch(ns)
-
-    titles = {}
-    if title_items:
-        for item in title_items:
-            titles[item.key] = item.value.get("title", "Nova conversa")
+    # Fetch titles from store (graceful degradation se store indisponivel)
+    titles: dict[str, str] = {}
+    try:
+        ns = StoreNamespace.conversation_titles(str(user.user_id), account_id)
+        title_items = await store.asearch(ns)
+        if title_items:
+            for item in title_items:
+                titles[item.key] = item.value.get("title", "Nova conversa")
+    except Exception as e:
+        logger.warning("conversations.store_search_failed", error=str(e))
 
     conversations = []
     for row in threads:
