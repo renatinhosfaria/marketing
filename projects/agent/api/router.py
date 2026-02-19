@@ -143,6 +143,13 @@ async def chat_stream(
     )
 
     # Semaphore distribuído via Redis (ou fallback in-memory em dev)
+    #
+    # NOTA: o pre-check abaixo (is_full / locked) é best-effort — retorna HTTP 429
+    # antes de iniciar o StreamingResponse, mas NÃO é atômico com o acquire() real
+    # dentro do event_generator. Em cenários de alta concorrência pode haver
+    # false-positives (rejeição com slot disponível) ou false-negatives (passa e
+    # falha no acquire interno, que retorna SSE error). O acquire() interno é a
+    # proteção real contra over-subscription.
     sem_factory = getattr(request.app.state, "sem_factory", None)
     if sem_factory is not None:
         redis_stream_sem = sem_factory.semaphore(

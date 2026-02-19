@@ -27,26 +27,35 @@ def test_reap_orphan_sse_sessions_skips_when_disabled(monkeypatch):
     assert result == {"skipped": True}
 
 
-def test_reap_orphan_sse_sessions_counts_active(monkeypatch):
-    """reap_orphan_sse_sessions conta meta-keys Redis e atualiza metrica."""
+def test_reap_orphan_sse_sessions_counts_only_active(monkeypatch):
+    """reap_orphan_sse_sessions conta apenas sessoes com status=active (orfas).
+
+    Sessoes com status=closed (encerradas explicitamente) NAO sao contadas,
+    mesmo que a meta-key ainda exista no Redis (TTL de 60s apos close).
+    """
     mock_settings = MagicMock()
     mock_settings.enable_agent_jobs = True
     mock_settings.agent_redis_url = "redis://test:6379/1"
     monkeypatch.setattr("projects.agent.jobs.retention.agent_settings", mock_settings)
 
     mock_redis = MagicMock()
-    # scan_iter retorna 3 meta-keys (sessoes ativas)
-    mock_redis.scan_iter.return_value = iter(["key1", "key2", "key3"])
+    # 3 meta-keys: 2 ativas (orfas), 1 encerrada
+    mock_redis.scan_iter.return_value = iter(["meta:k1", "meta:k2", "meta:k3"])
+    mock_redis.hget.side_effect = lambda key, field: {
+        "meta:k1": "active",   # orfa
+        "meta:k2": "closed",   # encerrada corretamente
+        "meta:k3": "active",   # orfa
+    }.get(key, None)
     mock_redis.close = MagicMock()
 
     mock_gauge = MagicMock()
 
-    with patch("projects.agent.jobs.retention.sync_redis.from_url", return_value=mock_redis) as mock_from_url, \
+    with patch("projects.agent.jobs.retention.sync_redis.from_url", return_value=mock_redis), \
          patch("projects.agent.observability.metrics.session_orphan_count", mock_gauge):
         from projects.agent.jobs.retention import reap_orphan_sse_sessions
         result = reap_orphan_sse_sessions()
 
-    assert result["active_sessions"] == 3
+    assert result["orphan_sessions"] == 2  # Apenas as ativas
     mock_redis.scan_iter.assert_called_once()
     mock_redis.close.assert_called_once()
 
@@ -86,4 +95,4 @@ def test_reap_orphan_sse_sessions_zero_sessions(monkeypatch):
         from projects.agent.jobs.retention import reap_orphan_sse_sessions
         result = reap_orphan_sse_sessions()
 
-    assert result["active_sessions"] == 0
+    assert result["orphan_sessions"] == 0

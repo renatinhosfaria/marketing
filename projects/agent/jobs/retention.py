@@ -65,7 +65,7 @@ def cleanup_agent_checkpoints():
         _validate_tables_exist(session)
 
         result = session.execute(text(
-            "DELETE FROM checkpoints WHERE updated_at < NOW() - INTERVAL '30 days'"
+            "DELETE FROM checkpoints WHERE created_at < NOW() - INTERVAL '30 days'"
         ))
         deleted = result.rowcount
         session.commit()
@@ -143,15 +143,20 @@ def reap_orphan_sse_sessions():
             socket_connect_timeout=5,
         )
 
-        # Conta todas as meta-keys presentes (cada uma = sessao ativa ou recentemente encerrada)
-        count = sum(1 for _ in r.scan_iter(_SESSION_META_PATTERN, count=100))
+        # Conta apenas sessoes com status="active" (orfas = ativas sem close_session)
+        # Sessoes encerradas explicitamente tem status="closed" e TTL de 60s.
+        count = 0
+        for key in r.scan_iter(_SESSION_META_PATTERN, count=100):
+            status = r.hget(key, "status")
+            if status == "active":
+                count += 1
         r.close()
 
         from projects.agent.observability.metrics import session_orphan_count
         session_orphan_count.set(count)
 
-        logger.info("agent.reap_orphan_sse_sessions.done", active_sessions=count)
-        return {"active_sessions": count}
+        logger.info("agent.reap_orphan_sse_sessions.done", orphan_sessions=count)
+        return {"orphan_sessions": count}
 
     except Exception as exc:
         logger.warning("agent.reap_orphan_sse_sessions.failed", error=str(exc))

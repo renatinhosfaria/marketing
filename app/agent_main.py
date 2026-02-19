@@ -279,5 +279,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8001,
         reload=settings.debug,
-        workers=1,  # OBRIGATORIO: semaphores in-memory
+        workers=1,  # Dev: single worker. Producao usa Swarm com WEB_CONCURRENCY (semaphores Redis).
     )

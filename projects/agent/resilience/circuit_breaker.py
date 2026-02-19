@@ -8,6 +8,15 @@ Estados:
   CLOSED    — operação normal; erros são contados
   OPEN      — fail-fast imediato; aguarda timeout para testar recuperação
   HALF_OPEN — permite uma chamada de teste; sucesso fecha, falha reabre
+
+LIMITAÇÃO DE ESCALA: o estado do circuit breaker é em-memória por processo.
+Com múltiplos workers (Swarm com replicas > 1), cada worker acumula falhas
+independentemente. Isso significa que todos os workers precisam atingir
+`failure_threshold` individualmente antes de abrir o circuito — em vez de
+`failure_threshold` falhas totais. Para o deployment atual (single-worker em
+dev, Swarm com WEB_CONCURRENCY controlado), o comportamento é correto.
+Para escala horizontal com estado compartilhado, o contador de falhas
+precisaria ser externalizado para Redis.
 """
 
 import asyncio

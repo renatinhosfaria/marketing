@@ -34,7 +34,7 @@ def sse_event_with_id(event_id: str, event_type: str, data: dict) -> str:
         String formatada como evento SSE com campo id.
     """
     payload = json.dumps(data, ensure_ascii=False, default=str)
-    return f"id:{event_id}\nevent:{event_type}\ndata:{payload}\n\n"
+    return f"id: {event_id}\nevent: {event_type}\ndata: {payload}\n\n"
 
 
 def _safe_json(content: str) -> dict | str:
