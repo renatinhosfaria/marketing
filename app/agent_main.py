@@ -123,31 +123,50 @@ async def lifespan(app: FastAPI):
     )
 
     # Inicializar semaphore factory (Redis distribuído)
+    # Feature flag: enable_redis_coordination=False desabilita para rollback rapido
     sem_factory = RedisSemaphoreFactory(agent_settings.agent_redis_url)
-    try:
-        await sem_factory.connect()
-        app.state.sem_factory = sem_factory
-    except Exception as e:
-        logger.warning(
-            "redis_semaphore.connect_failed",
-            error=str(e),
-            note="Continuando sem semaphores Redis — single-worker apenas.",
-        )
+    if agent_settings.enable_redis_coordination:
+        try:
+            await sem_factory.connect()
+            app.state.sem_factory = sem_factory
+            logger.info("redis_semaphore.enabled")
+        except Exception as e:
+            logger.warning(
+                "redis_semaphore.connect_failed",
+                error=str(e),
+                note="Continuando sem semaphores Redis — single-worker apenas.",
+            )
+            app.state.sem_factory = None
+    else:
+        logger.info("redis_semaphore.disabled", flag="enable_redis_coordination=False")
         app.state.sem_factory = None
 
     # Inicializar SSE session manager (Redis Stream para replay)
+    # Feature flag: enable_sse_replay=False desabilita replay de sessoes
     sse_manager = SSESessionManager(agent_settings.agent_redis_url)
-    try:
-        await sse_manager.connect()
-        app.state.sse_session_manager = sse_manager
-    except Exception as e:
-        logger.warning("sse_session_manager.connect_failed", error=str(e))
+    if agent_settings.enable_sse_replay:
+        try:
+            await sse_manager.connect()
+            app.state.sse_session_manager = sse_manager
+            logger.info("sse_replay.enabled")
+        except Exception as e:
+            logger.warning("sse_session_manager.connect_failed", error=str(e))
+            app.state.sse_session_manager = None
+    else:
+        logger.info("sse_replay.disabled", flag="enable_sse_replay=False")
         app.state.sse_session_manager = None
 
     # Inicializar circuit breaker registry
-    cb_registry = CircuitBreakerRegistry()
+    # Feature flag: enable_circuit_breaker=False usa CircuitBreakerRegistry com CB no-op
+    cb_registry = CircuitBreakerRegistry(
+        enabled=agent_settings.enable_circuit_breaker
+    )
     set_cb_registry(cb_registry)
     app.state.circuit_breaker_registry = cb_registry
+    logger.info(
+        "circuit_breaker.initialized",
+        enabled=agent_settings.enable_circuit_breaker,
+    )
 
     # Inicializar componentes via context managers
     async with create_store_cm() as store, create_checkpointer_cm() as checkpointer:

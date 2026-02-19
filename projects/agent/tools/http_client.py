@@ -151,8 +151,11 @@ async def _ml_api_call(
     start = time.monotonic()
     last_result: ToolResult | None = None
 
+    # Feature flag: enable_retry_jitter=False limita a 1 tentativa (rollback rapido)
+    max_attempts = _MAX_RETRY_ATTEMPTS if agent_settings.enable_retry_jitter else 1
+
     try:
-        for attempt in range(1, _MAX_RETRY_ATTEMPTS + 1):
+        for attempt in range(1, max_attempts + 1):
             try:
                 async def _do_request():
                     resp = await getattr(client, method)(
@@ -213,7 +216,7 @@ async def _ml_api_call(
                 )
 
             # Aguarda com jitter antes do proximo retry (exceto na ultima tentativa)
-            if attempt < _MAX_RETRY_ATTEMPTS:
+            if attempt < max_attempts:
                 delay = _retry_delay(attempt)
                 await asyncio.sleep(delay)
 

@@ -63,6 +63,13 @@ class AgentSettings(BaseSettings):
     enable_ml_endpoint_fixes: bool = True
     enable_agent_jobs: bool = True
 
+    # Rollout flags de confiabilidade (Waves 1-3)
+    # Desabilitar em emergencia para rollback rapido sem redeploy
+    enable_redis_coordination: bool = True   # Wave 1: semaphores Redis distribuidos
+    enable_circuit_breaker: bool = True       # Wave 1c/3b: circuit breaker ML + FB API
+    enable_sse_replay: bool = True            # Wave 2: Redis Stream + Last-Event-ID
+    enable_retry_jitter: bool = True          # Wave 3a: retry bounded com jitter
+
     # Rate limit do Agent API
     rate_limit_enabled: bool = True
     rate_limit_requests_per_minute: int = 120

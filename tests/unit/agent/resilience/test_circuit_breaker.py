@@ -186,3 +186,46 @@ class TestGlobalRegistry:
         assert get_registry() is new_reg
         # Restaurar
         set_registry(original)
+
+
+class TestCircuitBreakerRegistryDisabled:
+    """Feature flag enable_circuit_breaker=False retorna CB no-op."""
+
+    def test_disabled_registry_returns_noop(self):
+        reg = CircuitBreakerRegistry(enabled=False)
+        cb = reg.get("ml_api")
+        assert cb.is_open is False
+
+    def test_disabled_registry_status(self):
+        reg = CircuitBreakerRegistry(enabled=False)
+        status = reg.status()
+        assert status == {"status": "disabled"}
+
+    @pytest.mark.asyncio
+    async def test_noop_cb_passes_through(self):
+        reg = CircuitBreakerRegistry(enabled=False)
+        cb = reg.get("ml_api")
+
+        called = []
+
+        async def mock_func():
+            called.append(True)
+            return "result"
+
+        result = await cb.call(mock_func)
+        assert result == "result"
+        assert called == [True]
+
+    @pytest.mark.asyncio
+    async def test_noop_cb_never_opens(self):
+        reg = CircuitBreakerRegistry(enabled=False)
+        cb = reg.get("ml_api")
+
+        # Mesmo com multiplas falhas, nunca abre
+        for _ in range(10):
+            try:
+                await cb.call(lambda: (_ for _ in ()).throw(Exception("fail")))
+            except Exception:
+                pass
+
+        assert cb.is_open is False

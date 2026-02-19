@@ -184,19 +184,51 @@ def _set_metric(dependency: str, value: float):
         pass
 
 
+class _NoOpCircuitBreaker:
+    """Circuit breaker no-op — sempre CLOSED, passa tudo (usado quando disabled)."""
+
+    name = "noop"
+    state = CircuitState.CLOSED
+    is_open = False
+
+    def retry_after(self) -> float:
+        return 0.0
+
+    async def call(self, func: Callable[[], Awaitable[T]]) -> T:
+        return await func()
+
+    def reset(self):
+        pass
+
+
+_NOOP_CB = _NoOpCircuitBreaker()
+
+
 class CircuitBreakerRegistry:
     """
     Registro de circuit breakers por dependência.
 
     Uma instância por aplicação, inicializada no lifespan.
+
+    enabled=False: todas as chamadas usam _NoOpCircuitBreaker (rollback rapido).
     """
 
-    def __init__(self, default_config: CircuitBreakerConfig | None = None):
+    def __init__(
+        self,
+        default_config: CircuitBreakerConfig | None = None,
+        enabled: bool = True,
+    ):
         self._breakers: dict[str, CircuitBreaker] = {}
         self._default_config = default_config or CircuitBreakerConfig()
+        self.enabled = enabled
 
-    def get(self, dependency: str) -> CircuitBreaker:
-        """Retorna ou cria o circuit breaker para a dependência."""
+    def get(self, dependency: str) -> "CircuitBreaker | _NoOpCircuitBreaker":
+        """Retorna ou cria o circuit breaker para a dependência.
+
+        Retorna no-op se registry desabilitado (feature flag).
+        """
+        if not self.enabled:
+            return _NOOP_CB
         if dependency not in self._breakers:
             self._breakers[dependency] = CircuitBreaker(
                 dependency, self._default_config
@@ -205,6 +237,8 @@ class CircuitBreakerRegistry:
 
     def status(self) -> dict[str, str]:
         """Retorna estado de todos os circuit breakers."""
+        if not self.enabled:
+            return {"status": "disabled"}
         return {name: cb.state.value for name, cb in self._breakers.items()}
 
     def reset_all(self):
