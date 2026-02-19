@@ -38,7 +38,7 @@ export function SyncStatusBar({ configId }: SyncStatusBarProps) {
     try {
       await triggerTodaySync.mutateAsync(configId);
       toast.success("Sincronizacao iniciada", {
-        description: "Os dados de hoje estao sendo atualizados.",
+        description: "Os dados de hoje e dos ultimos dias estao sendo atualizados.",
       });
     } catch (error) {
       toast.error("Erro ao iniciar sincronizacao", {
@@ -211,7 +211,7 @@ export function SyncStatusBar({ configId }: SyncStatusBarProps) {
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Sincronizar dados de hoje</p>
+            <p>Sincronizar hoje e ultimos dias</p>
           </TooltipContent>
         </Tooltip>
       )}

@@ -1,0 +1,309 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - img [ref=e7]
+          - generic [ref=e9]: Marketing
+        - button [ref=e10]:
+          - img [ref=e11]
+      - navigation [ref=e14]:
+        - link "Facebook Ads" [ref=e15] [cursor=pointer]:
+          - /url: /app/facebook-ads
+          - img [ref=e16]
+          - text: Facebook Ads
+        - link "ML Analytics" [ref=e18] [cursor=pointer]:
+          - /url: /app/ml
+          - img [ref=e19]
+          - text: ML Analytics
+        - link "Agente IA" [ref=e29] [cursor=pointer]:
+          - /url: /app/ai-agent
+          - img [ref=e30]
+          - text: Agente IA
+      - generic [ref=e34]:
+        - generic [ref=e36]: AD
+        - generic [ref=e37]:
+          - paragraph [ref=e38]: Administrador
+          - paragraph [ref=e39]: Gestor
+    - generic [ref=e40]:
+      - banner [ref=e41]:
+        - heading "Agente IA" [level=1] [ref=e42]
+      - main [ref=e43]:
+        - generic [ref=e45]:
+          - generic [ref=e51]:
+            - generic [ref=e52]:
+              - img [ref=e53]
+              - generic [ref=e56]:
+                - heading "Agente de Trafego Pago" [level=1] [ref=e57]
+                - paragraph [ref=e58]: Analises e recomendacoes em tempo real
+            - generic [ref=e59]:
+              - generic [ref=e62]: Online
+              - combobox [ref=e63]:
+                - option "Famachat (act_24036721645944375)" [selected]
+              - button "Debug" [ref=e64]:
+                - img
+                - generic [ref=e65]: Debug
+          - generic [ref=e66]:
+            - complementary [ref=e68]:
+              - generic [ref=e69]:
+                - heading "Conversas" [level=3] [ref=e70]
+                - button "Nova conversa" [ref=e71]:
+                  - img
+              - generic [ref=e72]:
+                - generic [ref=e73]:
+                  - button "Oi, me da um resumo rapido 2 mensagens 10/02" [active] [ref=e74]:
+                    - generic [ref=e75]: Oi, me da um resumo rapido
+                    - generic [ref=e76]:
+                      - generic [ref=e77]: 2 mensagens
+                      - generic [ref=e78]: 10/02
+                  - button "Excluir conversa" [ref=e79]:
+                    - img
+                - generic [ref=e80]:
+                  - button "Quais recomendações devo seguir? 2 mensagens 10/02" [ref=e81]:
+                    - generic [ref=e82]: Quais recomendações devo seguir?
+                    - generic [ref=e83]:
+                      - generic [ref=e84]: 2 mensagens
+                      - generic [ref=e85]: 10/02
+                  - button "Excluir conversa" [ref=e86]:
+                    - img
+            - generic [ref=e88]:
+              - generic [ref=e89]:
+                - generic [ref=e90]:
+                  - img [ref=e91]
+                  - heading "Assistente de Tráfego Pago" [level=2] [ref=e94]
+                - generic [ref=e95]:
+                  - button "Nova conversa" [ref=e96]:
+                    - img
+                  - button "Limpar conversa" [ref=e97]:
+                    - img
+              - generic [ref=e101]:
+                - generic [ref=e118]:
+                  - img [ref=e120]
+                  - generic [ref=e124]: Oi, me da um resumo rapido
+                - generic [ref=e125]:
+                  - img [ref=e127]
+                  - generic [ref=e131]:
+                    - paragraph [ref=e132]:
+                      - text: "[Resumo Executivo]"
+                      - text: A conta está
+                      - strong [ref=e133]: ineficiente e pulverizada
+                      - text: ":"
+                      - strong [ref=e134]: 32% das campanhas em UNDERPERFORMER
+                      - text: e score médio
+                      - strong [ref=e135]: ~46/100
+                      - text: (saúde fraca). Oportunidade imediata é
+                      - strong [ref=e136]: cortar desperdício
+                      - text: nas campanhas com
+                      - strong [ref=e137]: CPL alto + baixo volume
+                      - text: e
+                      - strong [ref=e138]: realocar
+                      - text: para as poucas que entregam
+                      - strong [ref=e139]: CPL de R$ 6–11
+                      - text: com volume.
+                    - paragraph [ref=e140]: 🔴 Alertas Críticos (agir hoje — evitando queimar verba)
+                    - list [ref=e141]:
+                      - listitem [ref=e142]:
+                        - strong [ref=e143]: Campanha 120229994165550206 (UNDER)
+                        - text: ":"
+                        - strong [ref=e144]: CPL R$ 31,10 | 2 leads
+                      - listitem [ref=e145]:
+                        - text: "Ação:"
+                        - strong [ref=e146]: pausar agora
+                        - text: e
+                        - strong [ref=e147]: realocar budget
+                        - text: para HIGH/MODERATE fortes.
+                      - listitem [ref=e148]:
+                        - strong [ref=e149]: Campanha 120237855725490206 (UNDER)
+                        - text: ":"
+                        - strong [ref=e150]: CPL R$ 23,05 | 2 leads
+                      - listitem [ref=e151]:
+                        - text: "Ação:"
+                        - strong [ref=e152]: pausar ou reduzir >70%
+                        - text: imediatamente; só manter se houver teste estruturado (novo criativo/audiência).
+                      - listitem [ref=e153]:
+                        - strong [ref=e154]: Campanha 120234212518740206 (UNDER)
+                        - text: ":"
+                        - strong [ref=e155]: CPL R$ 19,14 | 1 lead
+                      - listitem [ref=e156]:
+                        - text: "Ação:"
+                        - strong [ref=e157]: pausar
+                        - text: (baixo volume sem evidência de eficiência).
+                    - blockquote [ref=e158]:
+                      - paragraph [ref=e159]:
+                        - text: "Observação: não dá para estimar R$/dia de perda sem o spend diário dessas campanhas no recorte, mas pelo padrão"
+                        - strong [ref=e160]: CPL alto + 1–2 leads/7d
+                        - text: ", a chance de desperdício é alta."
+                    - paragraph [ref=e161]: 📊 Performance Geral (50 campanhas)
+                    - list [ref=e162]:
+                      - listitem [ref=e163]:
+                        - strong [ref=e164]: 8 HIGH_PERFORMER (16%)
+                      - listitem [ref=e165]:
+                        - strong [ref=e166]: 13 MODERATE (26%)
+                      - listitem [ref=e167]:
+                        - strong [ref=e168]: 13 LOW (26%)
+                      - listitem [ref=e169]:
+                        - strong [ref=e170]: 16 UNDERPERFORMER (32%)
+                      - listitem [ref=e171]:
+                        - strong [ref=e172]: "Score proxy da conta:"
+                        - strong [ref=e173]: ~46/100
+                        - text: (abaixo do ideal)
+                    - paragraph [ref=e174]: Destaques de eficiência (candidatas a escala)
+                    - table [ref=e175]:
+                      - rowgroup [ref=e176]:
+                        - row "Tier Campanha CPL Leads Spend (7d) Leitura" [ref=e177]:
+                          - columnheader "Tier" [ref=e178]
+                          - columnheader "Campanha" [ref=e179]
+                          - columnheader "CPL" [ref=e180]
+                          - columnheader "Leads" [ref=e181]
+                          - columnheader "Spend (7d)" [ref=e182]
+                          - columnheader "Leitura" [ref=e183]
+                      - rowgroup [ref=e184]:
+                        - row "HIGH 120237856444520206 R$ 6,36 4 R$ 25,43 eficiência alta" [ref=e185]:
+                          - cell "HIGH" [ref=e186]
+                          - cell "120237856444520206" [ref=e187]
+                          - cell "R$ 6,36" [ref=e188]:
+                            - strong [ref=e189]: R$ 6,36
+                          - cell "4" [ref=e190]
+                          - cell "R$ 25,43" [ref=e191]
+                          - cell "eficiência alta" [ref=e192]
+                        - row "HIGH 120234212879950206 R$ 6,71 6 R$ 40,27 melhor combo CPL + volume" [ref=e193]:
+                          - cell "HIGH" [ref=e194]
+                          - cell "120234212879950206" [ref=e195]
+                          - cell "R$ 6,71" [ref=e196]:
+                            - strong [ref=e197]: R$ 6,71
+                          - cell "6" [ref=e198]
+                          - cell "R$ 40,27" [ref=e199]
+                          - cell "melhor combo CPL + volume" [ref=e200]
+                        - row "HIGH 120234039490540206 R$ 9,24 16 R$ 147,78 maior volume com CPL competitivo" [ref=e201]:
+                          - cell "HIGH" [ref=e202]
+                          - cell "120234039490540206" [ref=e203]
+                          - cell "R$ 9,24" [ref=e204]:
+                            - strong [ref=e205]: R$ 9,24
+                          - cell "16" [ref=e206]
+                          - cell "R$ 147,78" [ref=e207]
+                          - cell "maior volume com CPL competitivo" [ref=e208]
+                    - paragraph [ref=e209]: Zonas de transição (as “quase high”)
+                    - list [ref=e210]:
+                      - listitem [ref=e211]:
+                        - strong [ref=e212]: 120229994165540206 (MODERATE)
+                        - text: ":"
+                        - strong [ref=e213]: CPL R$ 7,09 | 8 leads
+                        - text: → promover com +budget
+                      - listitem [ref=e214]:
+                        - strong [ref=e215]: 120234039490420206 (MODERATE)
+                        - text: ":"
+                        - strong [ref=e216]: CPL R$ 7,95 | 7 leads
+                        - text: → promover com +budget
+                    - paragraph [ref=e217]: 💡 Recomendações Priorizadas (3–5 ações mais impactantes)
+                    - list [ref=e218]:
+                      - listitem [ref=e219]:
+                        - text: 🔴
+                        - strong [ref=e220]: "Cortar desperdício: pausar UNDER com CPL alto e baixo volume (hoje)"
+                    - list [ref=e221]:
+                      - listitem [ref=e222]:
+                        - text: "O que fazer:"
+                        - strong [ref=e223]: pausar
+                        - text: as 3 piores listadas e revisar o restante dos UNDER com a mesma lógica (
+                        - strong [ref=e224]: CPL alto + ≤2 leads/7d
+                        - text: ).
+                      - listitem [ref=e225]:
+                        - text: "Por quê: elas estão"
+                        - strong [ref=e226]: drenando verba sem tração
+                        - text: .
+                    - list [ref=e227]:
+                      - listitem [ref=e228]:
+                        - text: 🟠
+                        - strong [ref=e229]: Realocar budget para winners (a partir de hoje) — escala controlada
+                    - list [ref=e230]:
+                      - listitem [ref=e231]:
+                        - text: "O que fazer: aumentar"
+                        - strong [ref=e232]: +20–30% a cada 3–5 dias
+                        - text: "nas HIGH:"
+                      - listitem [ref=e233]: "120237856444520206"
+                      - listitem [ref=e234]: "120234212879950206"
+                      - listitem [ref=e235]: "120234039490540206"
+                      - listitem [ref=e236]: "E também nas MODERATE fortes:"
+                      - listitem [ref=e237]: "120229994165540206"
+                      - listitem [ref=e238]: "120234039490420206"
+                    - list [ref=e239]:
+                      - listitem [ref=e240]:
+                        - text: 🟠
+                        - strong [ref=e241]: "Limpar o “miolo” improdutivo: campanhas com gasto e 0 leads (esta semana)"
+                    - list [ref=e242]:
+                      - listitem [ref=e243]:
+                        - text: "O que fazer: identificar campanhas com"
+                        - strong [ref=e244]: spend > 0 e 0 leads
+                        - text: "(ex.: 120237857284580206, 120237857284570206, 120234212518600206) e aplicar regra:"
+                      - listitem [ref=e245]:
+                        - strong [ref=e246]: pausar
+                        - text: se não houver sinal de melhoria em 48–72h
+                      - listitem [ref=e247]:
+                        - text: ou
+                        - strong [ref=e248]: rodar como teste
+                        - text: com budget mínimo e hipótese clara (novo criativo/audiência)
+                    - list [ref=e249]:
+                      - listitem [ref=e250]:
+                        - text: 🟡
+                        - strong [ref=e251]: Reestruturação dos UNDER que você quer “salvar” (7 dias)
+                    - list [ref=e252]:
+                      - listitem [ref=e253]:
+                        - text: "O que fazer: para UNDER relevantes por tema/segmento, recriar em formato de teste:"
+                        - strong [ref=e254]: 1 variável por vez
+                        - text: (criativo / público / oferta), budget limitado e critério de corte por CPL/lead.
+                    - paragraph [ref=e255]: 📈 Contexto de Performance (o “porquê” integrado)
+                    - list [ref=e256]:
+                      - listitem [ref=e257]:
+                        - text: O problema central não é falta de campanhas — é
+                        - strong [ref=e258]: qualidade/tração
+                        - text: ": existe um bloco grande em"
+                        - strong [ref=e259]: 0–2 leads/7d
+                        - text: ", que derruba o score e sugere"
+                        - strong [ref=e260]: excesso de variações sem validação
+                        - text: .
+                      - listitem [ref=e261]:
+                        - text: "Quando a conta acerta, acerta bem: HIGHs entregando"
+                        - strong [ref=e262]: CPL ~R$ 6–11
+                        - text: e volume (até
+                        - strong [ref=e263]: 16 leads/7d
+                        - text: ).
+                    - paragraph [ref=e264]: ⚡ Quick Wins (agora)
+                    - list [ref=e265]:
+                      - listitem [ref=e266]:
+                        - strong [ref=e267]: Pausar imediatamente
+                        - text: ": 120229994165550206, 120237855725490206, 120234212518740206"
+                      - listitem [ref=e268]:
+                        - strong [ref=e269]: Subir budget hoje (com controle)
+                        - text: ": +20% nas 3 HIGH e nas 2 MODERATE fortes listadas"
+                      - listitem [ref=e270]:
+                        - strong [ref=e271]: Auditar “spend sem lead”
+                        - text: nas campanhas citadas e aplicar corte em 48–72h
+                    - paragraph [ref=e272]: ⚠️ Falhas/Lacunas de dados (para fechar diagnóstico)
+                    - list [ref=e273]:
+                      - listitem [ref=e274]:
+                        - text: Não temos
+                        - strong [ref=e275]: CTR, frequência, CPM e tendência
+                        - text: no snapshot → não dá para cravar se é
+                        - strong [ref=e276]: fadiga criativa, público saturado ou problema de oferta
+                        - text: .
+                      - listitem [ref=e277]:
+                        - text: "Próximo passo recomendado: puxar via"
+                        - code [ref=e278]: "`get_campaign_tier`"
+                        - text: para as
+                        - strong [ref=e279]: TOP 5 a escalar
+                        - text: e
+                        - strong [ref=e280]: TOP 10 a cortar
+                        - text: ", e fechar o plano com:"
+                        - strong [ref=e281]: frequência efetiva, tendência de CPL e sinais de fadiga
+                        - text: .
+                    - paragraph [ref=e282]:
+                      - text: Se sua meta principal for
+                      - strong [ref=e283]: crescer volume
+                      - text: vs
+                      - strong [ref=e284]: reduzir CPL
+                      - text: ", eu ajusto o plano de realocação (quanto tirar dos UNDER e quanto colocar em cada HIGH/MODERATE) com uma regra objetiva de budget."
+              - generic [ref=e116]:
+                - textbox "Pergunte sobre suas campanhas..." [ref=e117]
+                - button "Enviar" [disabled]:
+                  - img
+  - region "Notifications alt+T"
+  - alert [ref=e50]

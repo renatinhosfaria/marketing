@@ -52,7 +52,7 @@ export default function FacebookAdsCampaignDetail() {
   const router = useRouter();
   const campaignId = params.id || null;
 
-  const [datePreset, setDatePreset] = useState<DatePreset>("last_30d");
+  const [datePreset, setDatePreset] = useState<DatePreset>("today");
   const [activeTab, setActiveTab] = useState("overview");
 
   // Buscar configs para obter configId

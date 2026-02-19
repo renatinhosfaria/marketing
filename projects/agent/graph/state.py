@@ -1,101 +1,58 @@
 """
-Definição do estado do agente de tráfego pago.
+State schemas do grafo principal (Supervisor).
 
-⚠️ DEPRECATION WARNING:
-Este módulo define o estado do agente monolítico LEGADO e está DEPRECADO desde 2026-01-21.
-Use app/agent/orchestrator/state.py (OrchestratorState) ou app/agent/subagents/state.py (SubagentState).
-
-Para habilitar o novo sistema: AGENT_MULTI_AGENT_ENABLED=true
+SupervisorState: estado compartilhado do grafo principal.
+AgentReport: contrato de retorno dos agentes para o Synthesizer.
+UserContext: dados do usuario autenticado.
+AgentInput: input padrao para todos os subgraphs (compativel com Send()).
 """
 
-import warnings
-from typing import TypedDict, Annotated, Sequence, Optional, Any
-
-warnings.warn(
-    "app.agent.graph.state está DEPRECADO. Use app.agent.orchestrator.state ou app.agent.subagents.state",
-    DeprecationWarning,
-    stacklevel=2
-)
+from typing import Annotated, List, Optional, Literal
+from typing_extensions import TypedDict
 from langgraph.graph.message import add_messages
+from langgraph.managed import RemainingSteps
+from langchain_core.messages import AnyMessage
+import operator
 
 
-class AgentState(TypedDict):
+class AgentReport(TypedDict):
+    """Relatorio produzido por cada agente para o Synthesizer."""
+    agent_id: str
+    status: Literal["running", "completed", "error"]
+    summary: str              # Resumo textual para o Synthesizer
+    data: Optional[dict]      # Dados estruturados (metricas, scores)
+    confidence: float         # 0.0 - 1.0
+
+
+class UserContext(TypedDict):
+    """Dados do usuario autenticado, injetados pelo endpoint."""
+    user_id: str
+    account_id: str
+    account_name: str
+    timezone: str             # Default: America/Sao_Paulo
+
+
+class SupervisorState(TypedDict):
+    """Estado global do grafo principal.
+
+    - messages: historico de mensagens (reducer: add_messages)
+    - agent_reports: acumula reports dos agentes via operator.add (fan-in)
+    - remaining_steps: controle de recursao (managed pelo LangGraph)
     """
-    Estado do agente de tráfego pago.
+    messages: Annotated[List[AnyMessage], add_messages]
+    user_context: UserContext
+    routing_decision: Optional[dict]
+    agent_reports: Annotated[List[AgentReport], operator.add]
+    pending_actions: List[dict]
+    synthesis: Optional[str]
+    remaining_steps: RemainingSteps
 
-    Este estado é passado entre os nós do grafo LangGraph
-    e mantém todo o contexto da conversa.
+
+class AgentInput(TypedDict):
+    """Input padrao para TODOS os subgraphs.
+
+    Compativel com o arg do Send() no supervisor.
+    O scope e propagado para que cada agente filtre por entidades/periodo relevantes.
     """
-
-    # ==========================================
-    # Mensagens da conversa
-    # ==========================================
-    # Acumula mensagens usando add_messages reducer
-    messages: Annotated[Sequence[dict], add_messages]
-
-    # ==========================================
-    # Contexto da sessão
-    # ==========================================
-    config_id: int          # ID da configuração Facebook Ads
-    user_id: int            # ID do usuário autenticado
-    thread_id: str          # ID da thread para persistência
-
-    # ==========================================
-    # Dados coletados durante análise
-    # ==========================================
-    classifications: Optional[list[dict]]    # Classificações de campanhas
-    recommendations: Optional[list[dict]]    # Recomendações ativas
-    anomalies: Optional[list[dict]]          # Anomalias detectadas
-    forecasts: Optional[list[dict]]          # Previsões de métricas
-
-    # ==========================================
-    # Estado da análise atual
-    # ==========================================
-    current_intent: Optional[str]            # Intenção detectada do usuário
-    selected_campaigns: list[str]            # IDs de campanhas selecionadas
-    analysis_result: Optional[dict]          # Resultado da análise
-
-    # ==========================================
-    # Metadados de execução
-    # ==========================================
-    tool_calls_count: int                    # Contador de tool calls no turno
-    last_error: Optional[str]                # Último erro ocorrido (se houver)
-
-
-def create_initial_state(
-    config_id: int,
-    user_id: int,
-    thread_id: str,
-    initial_message: Optional[dict] = None
-) -> AgentState:
-    """
-    Cria o estado inicial do agente.
-
-    Args:
-        config_id: ID da configuração Facebook Ads
-        user_id: ID do usuário
-        thread_id: ID da thread de conversa
-        initial_message: Mensagem inicial opcional
-
-    Returns:
-        Estado inicial do agente
-    """
-    messages = []
-    if initial_message:
-        messages.append(initial_message)
-
-    return AgentState(
-        messages=messages,
-        config_id=config_id,
-        user_id=user_id,
-        thread_id=thread_id,
-        classifications=None,
-        recommendations=None,
-        anomalies=None,
-        forecasts=None,
-        current_intent=None,
-        selected_campaigns=[],
-        analysis_result=None,
-        tool_calls_count=0,
-        last_error=None,
-    )
+    messages: List[AnyMessage]
+    scope: Optional[dict]

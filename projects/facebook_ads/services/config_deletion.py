@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from typing import Sequence
-
-from sqlalchemy import delete, select, text
+from sqlalchemy import delete, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from projects.agent.db.models import AgentCheckpoint, AgentConversation, AgentWrite
 from projects.facebook_ads.models.management import (
     MLFacebookAdsManagementLog,
     MLFacebookAdsRateLimitLog,
@@ -54,7 +51,6 @@ async def _get_missing_tables(db: AsyncSession, table_names: set[str]) -> set[st
 
 def build_hard_delete_statements(
     config_id: int,
-    thread_ids: Sequence[str],
     skip_tables: set[str] | None = None,
 ):
     statements = []
@@ -63,18 +59,7 @@ def build_hard_delete_statements(
     def should_include(table_name: str) -> bool:
         return table_name not in skip_tables
 
-    if thread_ids:
-        if should_include(AgentCheckpoint.__tablename__):
-            statements.append(
-                delete(AgentCheckpoint).where(AgentCheckpoint.thread_id.in_(thread_ids))
-            )
-        if should_include(AgentWrite.__tablename__):
-            statements.append(
-                delete(AgentWrite).where(AgentWrite.thread_id.in_(thread_ids))
-            )
-
     delete_statements = [
-        (AgentConversation, AgentConversation.config_id == config_id),
         (MLPrediction, MLPrediction.config_id == config_id),
         (MLCampaignClassification, MLCampaignClassification.config_id == config_id),
         (MLRecommendation, MLRecommendation.config_id == config_id),
@@ -102,13 +87,6 @@ def build_hard_delete_statements(
 
 
 async def hard_delete_config(db: AsyncSession, config_id: int) -> None:
-    result = await db.execute(
-        select(AgentConversation.thread_id).where(
-            AgentConversation.config_id == config_id
-        )
-    )
-    thread_ids = result.scalars().all()
-
     missing_tables = await _get_missing_tables(db, _OPTIONAL_DELETE_TABLES)
     if missing_tables:
         logger.warning(
@@ -119,7 +97,6 @@ async def hard_delete_config(db: AsyncSession, config_id: int) -> None:
 
     for statement in build_hard_delete_statements(
         config_id,
-        thread_ids,
         skip_tables=missing_tables,
     ):
         await db.execute(statement)

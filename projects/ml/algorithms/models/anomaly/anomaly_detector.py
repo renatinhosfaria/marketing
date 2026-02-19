@@ -345,8 +345,8 @@ class AnomalyDetector:
         if missing_features:
             return []
 
-        # Get current values
-        current_row = df.iloc[-1][self.isolation_forest_features].values.reshape(1, -1)
+        # Get current values (cast to float to handle Decimal types from DB)
+        current_row = df.iloc[-1][self.isolation_forest_features].values.astype(float).reshape(1, -1)
 
         # Check for NaN values
         if np.isnan(current_row).any():

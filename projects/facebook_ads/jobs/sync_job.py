@@ -42,17 +42,18 @@ def facebook_ads_sync_incremental(self):
             logger.info("Sync incremental iniciado", total_configs=len(configs))
 
             for config in configs:
+                cfg_id = config.id  # capture before any rollback expires attributes
                 try:
                     service = SyncService(session)
-                    sync_history = await service.start_sync(config.id, "incremental")
+                    sync_history = await service.start_sync(cfg_id, "incremental")
                     await service.execute_sync(sync_history.id, "incremental")
                     await session.commit()
-                    logger.info("Sync incremental concluído", config_id=config.id)
+                    logger.info("Sync incremental concluído", config_id=cfg_id)
                 except Exception as e:
                     await session.rollback()
                     logger.error(
                         "Erro no sync incremental",
-                        config_id=config.id,
+                        config_id=cfg_id,
                         error=str(e),
                     )
 
@@ -94,17 +95,18 @@ def facebook_ads_sync_full(self):
             logger.info("Sync completo iniciado", total_configs=len(configs))
 
             for config in configs:
+                cfg_id = config.id  # capture before any rollback expires attributes
                 try:
                     service = SyncService(session)
-                    sync_history = await service.start_sync(config.id, "full")
+                    sync_history = await service.start_sync(cfg_id, "full")
                     await service.execute_sync(sync_history.id, "full")
                     await session.commit()
-                    logger.info("Sync completo concluído", config_id=config.id)
+                    logger.info("Sync completo concluído", config_id=cfg_id)
                 except Exception as e:
                     await session.rollback()
                     logger.error(
                         "Erro no sync completo",
-                        config_id=config.id,
+                        config_id=cfg_id,
                         error=str(e),
                     )
 

@@ -208,13 +208,14 @@ async def _train_classifier_for_config(
         Dict with model_id, samples_used, metrics
     """
     from projects.ml.services.classification_service import ClassificationService
+    from shared.config import settings
 
     async with session_maker() as session:
         service = ClassificationService(session)
 
         result = await service.train_classifier(
             config_id=config_id,
-            min_samples=30,
+            min_samples=settings.ml_min_samples_for_training,
             prefer_real_feedback=True,
         )
 
@@ -222,7 +223,7 @@ async def _train_classifier_for_config(
             return {
                 "status": "insufficient_data",
                 "samples_available": 0,
-                "samples_required": 30,
+                "samples_required": settings.ml_min_samples_for_training,
             }
 
         return result

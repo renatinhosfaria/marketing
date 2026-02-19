@@ -4,7 +4,7 @@ Implementa dual-table (today/history) e async reports para backfill.
 """
 
 from datetime import datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any, Optional
 
 from sqlalchemy import select, delete, and_
@@ -179,12 +179,49 @@ class SyncInsightsService:
     async def sync_yesterday(self, config: SistemaFacebookAdsConfig) -> dict[str, int]:
         """Sincroniza insights de ontem (consolidação today -> history)."""
         yesterday = get_today_sao_paulo() - timedelta(days=1)
+        return await self._sync_day_to_history(config, yesterday)
+
+    async def sync_recent_days(self, config: SistemaFacebookAdsConfig, days_back: int = 3) -> dict[str, int]:
+        """Re-busca os últimos N dias para capturar atribuições retroativas do Facebook.
+
+        O Facebook pode levar até 72h para finalizar dados de insights.
+        Esta função faz upsert dos dias recentes, atualizando registros
+        existentes com dados mais recentes da API.
+        """
+        today = get_today_sao_paulo()
+        totals = {"synced": 0, "inserted": 0, "updated": 0, "errors": 0}
+
+        for i in range(1, days_back + 1):
+            target_date = today - timedelta(days=i)
+            try:
+                result = await self._sync_day_to_history(config, target_date)
+                for key in totals:
+                    totals[key] += result[key]
+            except Exception as e:
+                logger.error(
+                    "Erro ao re-consolidar dia",
+                    config_id=config.id,
+                    date=str(target_date),
+                    error=str(e),
+                )
+                totals["errors"] += 1
+
+        logger.info(
+            "Re-consolidação de dias recentes concluída",
+            config_id=config.id,
+            days_back=days_back,
+            **totals,
+        )
+        return totals
+
+    async def _sync_day_to_history(self, config: SistemaFacebookAdsConfig, target_date) -> dict[str, int]:
+        """Busca insights de um dia específico na API e faz upsert na history."""
         time_range = {
-            "since": yesterday.strftime("%Y-%m-%d"),
-            "until": yesterday.strftime("%Y-%m-%d"),
+            "since": target_date.strftime("%Y-%m-%d"),
+            "until": target_date.strftime("%Y-%m-%d"),
         }
 
-        logger.info("Sync de insights de ontem", config_id=config.id, date=str(yesterday))
+        logger.info("Sync de insights para history", config_id=config.id, date=str(target_date))
 
         access_token = decrypt_token(config.access_token)
         graph_client = FacebookGraphClient(access_token, config.account_id)
@@ -212,7 +249,7 @@ class SyncInsightsService:
                             and_(
                                 SistemaFacebookAdsInsightsHistory.config_id == config.id,
                                 SistemaFacebookAdsInsightsHistory.ad_id == ad_id,
-                                SistemaFacebookAdsInsightsHistory.date == yesterday,
+                                SistemaFacebookAdsInsightsHistory.date == target_date,
                             )
                         )
                     )
@@ -291,7 +328,7 @@ class SyncInsightsService:
             # CTRs
             unique_ctr=Decimal(str(insight["unique_ctr"])) if insight.get("unique_ctr") else None,
             inline_link_click_ctr=Decimal(str(insight["inline_link_click_ctr"])) if insight.get("inline_link_click_ctr") else None,
-            outbound_clicks_ctr=Decimal(str(insight["outbound_clicks_ctr"])) if insight.get("outbound_clicks_ctr") else None,
+            outbound_clicks_ctr=self._extract_ctr_decimal(insight.get("outbound_clicks_ctr")),
             # Video funnel
             video_plays=extract_video_metric(insight, "video_play_actions"),
             video_15s_watched=extract_video_metric(insight, "video_15_sec_watched_actions"),
@@ -312,7 +349,7 @@ class SyncInsightsService:
             # Unique CTRs
             unique_link_clicks_ctr=Decimal(str(insight["unique_link_clicks_ctr"])) if insight.get("unique_link_clicks_ctr") else None,
             unique_inline_link_click_ctr=Decimal(str(insight["unique_inline_link_click_ctr"])) if insight.get("unique_inline_link_click_ctr") else None,
-            unique_outbound_clicks_ctr=Decimal(str(insight["unique_outbound_clicks_ctr"])) if insight.get("unique_outbound_clicks_ctr") else None,
+            unique_outbound_clicks_ctr=self._extract_ctr_decimal(insight.get("unique_outbound_clicks_ctr")),
             # Brand awareness
             estimated_ad_recallers=int(insight["estimated_ad_recallers"]) if insight.get("estimated_ad_recallers") else None,
             estimated_ad_recall_rate=Decimal(str(insight["estimated_ad_recall_rate"])) if insight.get("estimated_ad_recall_rate") else None,
@@ -380,7 +417,7 @@ class SyncInsightsService:
             # CTRs
             unique_ctr=Decimal(str(insight["unique_ctr"])) if insight.get("unique_ctr") else None,
             inline_link_click_ctr=Decimal(str(insight["inline_link_click_ctr"])) if insight.get("inline_link_click_ctr") else None,
-            outbound_clicks_ctr=Decimal(str(insight["outbound_clicks_ctr"])) if insight.get("outbound_clicks_ctr") else None,
+            outbound_clicks_ctr=self._extract_ctr_decimal(insight.get("outbound_clicks_ctr")),
             # Video funnel
             video_plays=extract_video_metric(insight, "video_play_actions"),
             video_15s_watched=extract_video_metric(insight, "video_15_sec_watched_actions"),
@@ -401,7 +438,7 @@ class SyncInsightsService:
             # Unique CTRs
             unique_link_clicks_ctr=Decimal(str(insight["unique_link_clicks_ctr"])) if insight.get("unique_link_clicks_ctr") else None,
             unique_inline_link_click_ctr=Decimal(str(insight["unique_inline_link_click_ctr"])) if insight.get("unique_inline_link_click_ctr") else None,
-            unique_outbound_clicks_ctr=Decimal(str(insight["unique_outbound_clicks_ctr"])) if insight.get("unique_outbound_clicks_ctr") else None,
+            unique_outbound_clicks_ctr=self._extract_ctr_decimal(insight.get("unique_outbound_clicks_ctr")),
             # Brand awareness
             estimated_ad_recallers=int(insight["estimated_ad_recallers"]) if insight.get("estimated_ad_recallers") else None,
             estimated_ad_recall_rate=Decimal(str(insight["estimated_ad_recall_rate"])) if insight.get("estimated_ad_recall_rate") else None,
@@ -458,7 +495,7 @@ class SyncInsightsService:
         obj.cost_per_thruplay = extract_action_stat_value(insight.get("cost_per_thruplay"), decimal_result=True) or None
         obj.unique_ctr = Decimal(str(insight["unique_ctr"])) if insight.get("unique_ctr") else None
         obj.inline_link_click_ctr = Decimal(str(insight["inline_link_click_ctr"])) if insight.get("inline_link_click_ctr") else None
-        obj.outbound_clicks_ctr = Decimal(str(insight["outbound_clicks_ctr"])) if insight.get("outbound_clicks_ctr") else None
+        obj.outbound_clicks_ctr = self._extract_ctr_decimal(insight.get("outbound_clicks_ctr"))
         obj.video_plays = extract_video_metric(insight, "video_play_actions")
         obj.video_15s_watched = extract_video_metric(insight, "video_15_sec_watched_actions")
         obj.video_p25_watched = extract_video_metric(insight, "video_p25_watched_actions")
@@ -475,7 +512,7 @@ class SyncInsightsService:
         obj.cost_per_inline_post_engagement = Decimal(str(insight["cost_per_inline_post_engagement"])) if insight.get("cost_per_inline_post_engagement") else None
         obj.unique_link_clicks_ctr = Decimal(str(insight["unique_link_clicks_ctr"])) if insight.get("unique_link_clicks_ctr") else None
         obj.unique_inline_link_click_ctr = Decimal(str(insight["unique_inline_link_click_ctr"])) if insight.get("unique_inline_link_click_ctr") else None
-        obj.unique_outbound_clicks_ctr = Decimal(str(insight["unique_outbound_clicks_ctr"])) if insight.get("unique_outbound_clicks_ctr") else None
+        obj.unique_outbound_clicks_ctr = self._extract_ctr_decimal(insight.get("unique_outbound_clicks_ctr"))
         obj.estimated_ad_recallers = int(insight["estimated_ad_recallers"]) if insight.get("estimated_ad_recallers") else None
         obj.estimated_ad_recall_rate = Decimal(str(insight["estimated_ad_recall_rate"])) if insight.get("estimated_ad_recall_rate") else None
         obj.cost_per_estimated_ad_recallers = Decimal(str(insight["cost_per_estimated_ad_recallers"])) if insight.get("cost_per_estimated_ad_recallers") else None
@@ -483,6 +520,21 @@ class SyncInsightsService:
         obj.converted_product_quantity = int(insight["converted_product_quantity"]) if insight.get("converted_product_quantity") else None
         obj.converted_product_value = Decimal(str(insight["converted_product_value"])) if insight.get("converted_product_value") else None
         obj.consolidated_at = datetime.utcnow()
+
+    @staticmethod
+    def _extract_ctr_decimal(value) -> Decimal | None:
+        """Extrai campos de CTR que podem vir como string decimal ou AdsActionStats[]."""
+        if value is None or value == "":
+            return None
+
+        if isinstance(value, list):
+            parsed = extract_action_stat_value(value, decimal_result=True)
+            return parsed if parsed != Decimal("0") else None
+
+        try:
+            return Decimal(str(value))
+        except (InvalidOperation, ValueError, TypeError):
+            return None
 
     @staticmethod
     def _extract_outbound_clicks(insight: dict) -> int:

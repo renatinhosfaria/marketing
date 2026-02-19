@@ -47,7 +47,7 @@ type TabValue = "campaigns" | "adsets" | "ads";
 export default function FacebookAdsDashboard() {
   const router = useRouter();
   // Estado do filtro de periodo
-  const [datePreset, setDatePreset] = useState<DatePreset>("last_30d");
+  const [datePreset, setDatePreset] = useState<DatePreset>("today");
   const [activeTab, setActiveTab] = useState<TabValue>("campaigns");
 
   // Estados de filtro por aba

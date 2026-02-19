@@ -1,0 +1,108 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - img [ref=e7]
+          - generic [ref=e9]: Marketing
+        - button [ref=e10]:
+          - img [ref=e11]
+      - navigation [ref=e14]:
+        - link "Facebook Ads" [ref=e15] [cursor=pointer]:
+          - /url: /app/facebook-ads
+          - img [ref=e16]
+          - text: Facebook Ads
+        - link "ML Analytics" [ref=e18] [cursor=pointer]:
+          - /url: /app/ml
+          - img [ref=e19]
+          - text: ML Analytics
+        - link "Agente IA" [ref=e29] [cursor=pointer]:
+          - /url: /app/ai-agent
+          - img [ref=e30]
+          - text: Agente IA
+      - generic [ref=e34]:
+        - generic [ref=e36]: AD
+        - generic [ref=e37]:
+          - paragraph [ref=e38]: Administrador
+          - paragraph [ref=e39]: Gestor
+    - generic [ref=e40]:
+      - banner [ref=e41]:
+        - heading "Facebook Ads" [level=1] [ref=e42]
+      - main [ref=e43]:
+        - generic [ref=e44]:
+          - generic [ref=e45]:
+            - generic [ref=e46]:
+              - heading "Facebook Ads" [level=1] [ref=e47]
+              - paragraph [ref=e48]: Analise de desempenho de campanhas
+            - generic [ref=e49]:
+              - combobox [ref=e50]:
+                - img
+                - img
+              - combobox [ref=e51]
+              - button "Abrir configuracoes" [ref=e52]:
+                - img
+          - generic [ref=e89]:
+            - tablist [ref=e90]:
+              - tab "Campanhas" [selected] [ref=e91]:
+                - img
+                - generic [ref=e92]: Campanhas
+              - tab "Conjuntos" [ref=e93]:
+                - img
+                - generic [ref=e94]: Conjuntos
+              - tab "Anuncios" [ref=e95]:
+                - img
+                - generic [ref=e96]: Anuncios
+            - tabpanel "Campanhas" [ref=e97]:
+              - generic [ref=e98]:
+                - heading "Campanhas" [level=2] [ref=e99]
+                - paragraph [ref=e100]: Visualize o desempenho das suas campanhas de marketing
+              - generic [ref=e101]:
+                - generic [ref=e102]:
+                  - generic [ref=e103]:
+                    - img [ref=e104]
+                    - textbox "Buscar campanha..." [ref=e107]
+                  - combobox [ref=e108]:
+                    - img
+                  - combobox [ref=e109]
+                - table [ref=e112]:
+                  - rowgroup [ref=e113]:
+                    - row "Nome Status Gasto Leads CPM CPC CPL CTR" [ref=e114]:
+                      - columnheader "Nome" [ref=e115] [cursor=pointer]:
+                        - generic [ref=e116]:
+                          - text: Nome
+                          - img [ref=e117]
+                      - columnheader "Status" [ref=e120] [cursor=pointer]:
+                        - generic [ref=e121]:
+                          - text: Status
+                          - img [ref=e122]
+                      - columnheader "Gasto" [ref=e125] [cursor=pointer]:
+                        - generic [ref=e126]:
+                          - text: Gasto
+                          - img [ref=e127]
+                      - columnheader "Leads" [ref=e129] [cursor=pointer]:
+                        - generic [ref=e130]:
+                          - text: Leads
+                          - img [ref=e131]
+                      - columnheader "CPM" [ref=e134] [cursor=pointer]:
+                        - generic [ref=e135]:
+                          - text: CPM
+                          - img [ref=e136]
+                      - columnheader "CPC" [ref=e139] [cursor=pointer]:
+                        - generic [ref=e140]:
+                          - text: CPC
+                          - img [ref=e141]
+                      - columnheader "CPL" [ref=e144] [cursor=pointer]:
+                        - generic [ref=e145]:
+                          - text: CPL
+                          - img [ref=e146]
+                      - columnheader "CTR" [ref=e149] [cursor=pointer]:
+                        - generic [ref=e150]:
+                          - text: CTR
+                          - img [ref=e151]
+                      - columnheader [ref=e154]
+                  - rowgroup [ref=e155]:
+                    - row "Nenhuma campanha disponivel." [ref=e156]:
+                      - cell "Nenhuma campanha disponivel." [ref=e157]
+                - generic [ref=e158]: 0 campanha(s)
+  - region "Notifications alt+T"
+  - alert [ref=e159]

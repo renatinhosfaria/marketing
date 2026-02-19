@@ -4,7 +4,7 @@ import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "Marketing",
-  description: "Marketing - Analytics & AI Agent",
+  description: "Marketing - Analytics",
 };
 
 export default function RootLayout({

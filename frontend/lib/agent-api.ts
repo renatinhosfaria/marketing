@@ -1,5 +1,9 @@
 import { SSEEvent } from '@/types/ai-agent';
-import type { ConversationPreview, ConversationMessages } from '@/types/ai-agent';
+import type {
+  ConversationPreview,
+  ConversationMessages,
+  ResumePayload,
+} from '@/types/ai-agent';
 
 /**
  * Faz parse de eventos SSE (Server-Sent Events) a partir de texto bruto.
@@ -39,18 +43,12 @@ export async function sendAgentMessage(
   message: string,
   threadId: string,
   accountId: string,
-  resumePayload?: Record<string, any>
+  resumePayload?: ResumePayload
 ): Promise<Response> {
-  // TODO: Obter API key do contexto de autenticacao do usuario
-  const apiKey = typeof window !== 'undefined'
-    ? localStorage.getItem('agent_api_key') || ''
-    : '';
-
   return fetch('/api/v1/agent/chat', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(apiKey && { 'X-API-Key': apiKey }),
     },
     body: JSON.stringify({
       message,
@@ -64,12 +62,8 @@ export async function sendAgentMessage(
 const AGENT_API_BASE = '/api/v1/agent';
 
 function getAgentHeaders(): Record<string, string> {
-  const apiKey = typeof window !== 'undefined'
-    ? localStorage.getItem('agent_api_key') || ''
-    : '';
   return {
     'Content-Type': 'application/json',
-    ...(apiKey && { 'X-API-Key': apiKey }),
   };
 }
 

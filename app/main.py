@@ -12,6 +12,7 @@ from shared.config import settings
 from shared.core.logging import setup_logging
 from shared.core.tracing.middleware import TraceMiddleware
 from shared.infrastructure.middleware.rate_limit import RateLimitMiddleware, RateLimitConfig
+from shared.observability import setup_metrics, setup_tracing, instrument_fastapi, instrument_sqlalchemy
 from app.router import api_router
 from shared.db.session import engine, check_database_connection
 
@@ -71,6 +72,14 @@ app = FastAPI(
     openapi_url="/openapi.json" if settings.debug else None,
     lifespan=lifespan
 )
+
+# Observabilidade: tracing + instrumentação (antes de adicionar middleware manual)
+setup_tracing(service_name="ml-api", service_version=settings.app_version)
+instrument_fastapi(app)
+instrument_sqlalchemy(engine)
+
+# Métricas Prometheus (/metrics)
+setup_metrics(app, service_name="ml-api")
 
 # Adicionar middleware de tracing (PRIMEIRO para capturar trace_id o mais cedo possível)
 app.add_middleware(TraceMiddleware)

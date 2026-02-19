@@ -7,16 +7,21 @@ ResumePayload: payload para retomar apos interrupt.
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, AliasChoices, ConfigDict
 from typing import Optional
+
+ACCOUNT_ID_PATTERN = r"^(act_)?\d+$"
 
 
 class ResumePayload(BaseModel):
     """Payload para retomar apos aprovacao (interrupt)."""
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
     approved: bool = Field(description="Se o usuario aprovou a acao")
     approval_token: str = Field(description="Token anti-forgery")
     new_budget_override: Optional[float] = Field(
         default=None,
+        validation_alias=AliasChoices("new_budget_override", "override_value"),
         description="Novo valor de budget editado pelo usuario (edit on resume)",
     )
 
@@ -31,6 +36,7 @@ class ChatRequest(BaseModel):
         description="ID da conversa (UUID gerado pelo frontend)",
     )
     account_id: str = Field(
+        pattern=ACCOUNT_ID_PATTERN,
         description="ID da conta de Facebook Ads",
     )
     resume_payload: Optional[ResumePayload] = Field(

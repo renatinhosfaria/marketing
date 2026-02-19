@@ -1,52 +1,99 @@
 "use client";
 
-/**
- * Balao de mensagem do chat do agente
- */
-
-import { Bot, User } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { AgentMessage } from "@/types/ai-agent";
+import { User, Bot } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkBreaks from "remark-breaks";
+import { StreamingText } from "./streaming-text";
+import type { Message } from "@/types/ai-agent";
 
 interface MessageBubbleProps {
-  message: AgentMessage;
+  message: Message;
+  isStreaming?: boolean;
+  isLastMessage?: boolean;
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+/**
+ * Bolha de mensagem com estilos diferenciados para user e assistant.
+ * User: alinhado a direita, bg-blue-600, texto branco.
+ * Assistant: alinhado a esquerda, bg-gray-100, suporta markdown.
+ */
+export function MessageBubble({
+  message,
+  isStreaming = false,
+  isLastMessage = false,
+}: MessageBubbleProps) {
   const isUser = message.role === "user";
+  const showStreamingCursor = isStreaming && isLastMessage && !isUser;
 
   return (
     <div
       className={cn(
-        "flex gap-3 max-w-[85%]",
-        isUser ? "ml-auto flex-row-reverse" : "mr-auto"
+        "flex gap-3 px-4",
+        isUser ? "justify-end" : "justify-start"
       )}
     >
+      {/* Avatar do assistente */}
+      {!isUser && (
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-1">
+          <Bot className="h-4 w-4 text-primary" />
+        </div>
+      )}
+
+      {/* Conteudo da mensagem */}
       <div
         className={cn(
-          "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center",
-          isUser ? "bg-primary text-primary-foreground" : "bg-muted"
+          "max-w-[75%] rounded-2xl px-4 py-2.5",
+          isUser
+            ? "bg-blue-600 text-white"
+            : "bg-muted text-foreground"
         )}
       >
         {isUser ? (
-          <User className="h-4 w-4" />
+          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+        ) : showStreamingCursor && !message.content ? (
+          <StreamingText content="" isStreaming={true} className="text-sm" />
+        ) : showStreamingCursor ? (
+          <StreamingText
+            content={message.content}
+            isStreaming={true}
+            className="text-sm"
+          />
         ) : (
-          <Bot className="h-4 w-4" />
+          <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-2 prose-pre:my-2">
+            <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+              {message.content}
+            </ReactMarkdown>
+          </div>
+        )}
+
+        {/* Tool results badges */}
+        {message.toolResults && message.toolResults.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-border/30">
+            {message.toolResults.map((tr, idx) => (
+              <span
+                key={idx}
+                className={cn(
+                  "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
+                  isUser
+                    ? "bg-blue-500/30 text-blue-100"
+                    : "bg-primary/10 text-primary"
+                )}
+              >
+                {tr.agent}: {tr.tool}
+              </span>
+            ))}
+          </div>
         )}
       </div>
-      <div
-        className={cn(
-          "rounded-lg px-4 py-2",
-          isUser ? "bg-primary text-primary-foreground" : "bg-muted"
-        )}
-      >
-        <div className="whitespace-pre-wrap text-sm">
-          {message.content}
-          {message.isStreaming && (
-            <span className="inline-block w-2 h-4 ml-1 bg-current animate-pulse" />
-          )}
+
+      {/* Avatar do usuario */}
+      {isUser && (
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 mt-1">
+          <User className="h-4 w-4 text-white" />
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -1,0 +1,255 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - img [ref=e7]
+          - generic [ref=e9]: Marketing
+        - button [ref=e10]:
+          - img [ref=e11]
+      - navigation [ref=e14]:
+        - link "Facebook Ads" [ref=e15] [cursor=pointer]:
+          - /url: /app/facebook-ads
+          - img [ref=e16]
+          - text: Facebook Ads
+        - link "ML Analytics" [ref=e18] [cursor=pointer]:
+          - /url: /app/ml
+          - img [ref=e19]
+          - text: ML Analytics
+        - link "Agente IA" [ref=e29] [cursor=pointer]:
+          - /url: /app/ai-agent
+          - img [ref=e30]
+          - text: Agente IA
+      - generic [ref=e34]:
+        - generic [ref=e36]: AD
+        - generic [ref=e37]:
+          - paragraph [ref=e38]: Administrador
+          - paragraph [ref=e39]: Gestor
+    - generic [ref=e40]:
+      - banner [ref=e41]:
+        - heading "Agente IA" [level=1] [ref=e42]
+      - main [ref=e43]:
+        - generic [ref=e45]:
+          - generic [ref=e51]:
+            - generic [ref=e52]:
+              - img [ref=e53]
+              - generic [ref=e56]:
+                - heading "Agente de Trafego Pago" [level=1] [ref=e57]
+                - paragraph [ref=e58]: Analises e recomendacoes em tempo real
+            - generic [ref=e59]:
+              - generic [ref=e62]: Online
+              - combobox [ref=e63]:
+                - option "Famachat (act_24036721645944375)" [selected]
+              - button "Debug" [ref=e64]:
+                - img
+                - generic [ref=e65]: Debug
+          - generic [ref=e66]:
+            - complementary [ref=e68]:
+              - generic [ref=e69]:
+                - heading "Conversas" [level=3] [ref=e70]
+                - button "Nova conversa" [ref=e71]:
+                  - img
+              - generic [ref=e73]:
+                - button "Quais recomendações devo seguir? 2 mensagens 10/02" [active] [ref=e74]:
+                  - generic [ref=e75]: Quais recomendações devo seguir?
+                  - generic [ref=e76]:
+                    - generic [ref=e77]: 2 mensagens
+                    - generic [ref=e78]: 10/02
+                - button "Excluir conversa" [ref=e79]:
+                  - img
+            - generic [ref=e81]:
+              - generic [ref=e82]:
+                - generic [ref=e83]:
+                  - img [ref=e84]
+                  - heading "Assistente de Tráfego Pago" [level=2] [ref=e87]
+                - generic [ref=e88]:
+                  - button "Nova conversa" [ref=e89]:
+                    - img
+                  - button "Limpar conversa" [ref=e90]:
+                    - img
+              - generic [ref=e94]:
+                - generic [ref=e111]:
+                  - img [ref=e113]
+                  - generic [ref=e117]: Quais recomendações devo seguir?
+                - generic [ref=e118]:
+                  - img [ref=e120]
+                  - heading [level=2] [ref=e125]:
+                    - text: "Resumo executivo - Você tem um mix grande (50 campanhas / 7 dias):"
+                    - strong [ref=e126]: 8 HIGH_PERFORMER
+                    - text: ","
+                    - strong [ref=e127]: 13 MODERATE
+                    - text: ","
+                    - strong [ref=e128]: 13 LOW
+                    - text: ","
+                    - strong [ref=e129]: 16 UNDERPERFORMER
+                    - text: . - A ação mais impactante agora é
+                    - strong [ref=e130]: realocar orçamento
+                    - text: ":"
+                    - strong [ref=e131]: escalar o que está barato e consistente
+                    - text: e
+                    - strong [ref=e132]: cortar rapidamente o que está caro e piorando
+                    - text: ". --- ## Alertas críticos (anomalias / desperdício) -"
+                    - strong [ref=e133]: "CPL muito acima da média e/ou piorando (cortar já):"
+                    - text: "-"
+                    - strong [ref=e134]:
+                      - text: Campanha
+                      - code [ref=e135]: "`120234212518590206`"
+                    - text: →
+                    - strong [ref=e136]: reduzir budget em -50%
+                    - text: "- Motivo:"
+                    - strong [ref=e137]: CPL R$ 28,58 (~240% da média)
+                    - text: e tendência
+                    - strong [ref=e138]: piorando (+100%)
+                    - text: . -
+                    - strong [ref=e139]: "Grupo UNDERPERFORMER (16 campanhas):"
+                    - text: forte candidato a
+                    - strong [ref=e140]: pausar/reestruturar
+                    - text: e
+                    - strong [ref=e141]: realocar verba
+                    - text: ". - Exemplos críticos (CPL alto + baixo volume): -"
+                    - code [ref=e142]: "`120229994165550206`"
+                    - text: —
+                    - strong [ref=e143]: CPL R$ 31,10 | 2 leads
+                    - text: "-"
+                    - code [ref=e144]: "`120237855725490206`"
+                    - text: —
+                    - strong [ref=e145]: CPL R$ 23,05 | 2 leads
+                    - text: "-"
+                    - code [ref=e146]: "`120234212518740206`"
+                    - text: —
+                    - strong [ref=e147]: CPL R$ 19,14 | 1 lead
+                    - text: "-"
+                    - strong [ref=e148]: "Campanhas com “0 leads” (principalmente LOW/MODERATE):"
+                    - text: "- Trate como alerta de"
+                    - strong [ref=e149]: baixo volume
+                    - text: ou
+                    - strong [ref=e150]: problema de tracking/conversão
+                    - text: (pixel/evento/form/landing). Antes de investir mais,
+                    - strong [ref=e151]: validar o funil
+                    - text: ". --- ## Análise de performance (o que está funcionando vs. o que não está) -"
+                    - strong [ref=e152]: "Ponto forte:"
+                    - text: existem campanhas com
+                    - strong [ref=e153]: CPL bem abaixo da média
+                    - text: ", prontas para receber mais verba. -"
+                    - strong [ref=e154]: "Campanhas com melhor base para escala (boa eficiência e/ou volume):"
+                    - text: "-"
+                    - code [ref=e155]: "`120230804266050206`"
+                    - text: —
+                    - strong [ref=e156]: CPL R$ 6,61–7,11
+                    - text: com
+                    - strong [ref=e157]: 8–11 leads/7d
+                    - text: (muito acima da eficiência média). -
+                    - code [ref=e158]: "`120234039490540206`"
+                    - text: —
+                    - strong [ref=e159]: ~16 leads/7d
+                    - text: com CPL eficiente (boa para ganhar volume). -
+                    - code [ref=e160]: "`120234212879790206`"
+                    - text: — CPL eficiente e estável (boa para aumentar moderadamente). -
+                    - strong [ref=e161]: "Sinal específico de problema “de público” (não de criativo):"
+                    - text: "-"
+                    - code [ref=e162]: "`120237856444700206`"
+                    - text: —
+                    - strong [ref=e163]: CPL +39,8%
+                    - text: ","
+                    - strong [ref=e164]: leads -44,4%
+                    - text: ", mas"
+                    - strong [ref=e165]: CTR +42,2%
+                    - text: → o anúncio atrai clique, mas
+                    - strong [ref=e166]: a qualidade do tráfego/segmentação caiu
+                    - text: ". --- ## Recomendações acionáveis (prioridade e o que fazer) ### 1) Escalar o que já está funcionando (prioridade mais alta) -"
+                    - strong [ref=e167]:
+                      - code [ref=e168]: "`120230804266050206`"
+                      - text: ": aumentar budget em +75%"
+                    - text: "- Fazer em 1 ajuste (ou"
+                    - strong [ref=e169]: +30% e depois +35% em 48h
+                    - text: "se a conta for sensível). - Observação: havia recomendações duplicadas para essa campanha —"
+                    - strong [ref=e170]: é uma única ação
+                    - text: ". ### 2) Cortar desperdício imediatamente -"
+                    - strong [ref=e171]:
+                      - code [ref=e172]: "`120234212518590206`"
+                      - text: ": reduzir budget em -50%"
+                    - text: (imediato) -
+                    - strong [ref=e173]:
+                      - code [ref=e174]: "`120233891992660206`"
+                      - text: ": reduzir budget em -30%"
+                    - text: "- Motivo:"
+                    - strong [ref=e175]: CPL R$ 20,86 (~163% da média)
+                    - text: e tendência de alta. - Reavaliar em
+                    - strong [ref=e176]: 48–72h
+                    - text: ". ### 3) Aumentos moderados (campanhas sólidas e estáveis) -"
+                    - strong [ref=e177]:
+                      - code [ref=e178]: "`120234039490540206`"
+                      - text: ": +25% de budget"
+                    - text: "-"
+                    - strong [ref=e179]:
+                      - code [ref=e180]: "`120234212879790206`"
+                      - text: ": +25% de budget"
+                    - text: "### 4) Diagnóstico de público (para recuperar leads sem necessariamente trocar criativo) -"
+                    - strong [ref=e181]:
+                      - code [ref=e182]: "`120237856444700206`"
+                      - text: ": revisar segmentação"
+                    - text: "- Ações práticas: - Ver breakdown por"
+                    - strong [ref=e183]: idade/gênero/região/posicionamento
+                    - text: e cortar piores. - Checar
+                    - strong [ref=e184]: sobreposição de públicos
+                    - text: e reduzir competição interna. - Criar
+                    - strong [ref=e185]: exclusões
+                    - text: (leads já captados/convertidos). - Testar
+                    - strong [ref=e186]: novos públicos
+                    - text: "(lookalike atualizado, broad controlado, interesses alternativos). ### 5) Rebalanceamento estrutural do portfólio (regra geral) -"
+                    - strong [ref=e187]: Reduzir/pausar UNDERPERFORMER (16 campanhas)
+                    - text: "e mover verba para: -"
+                    - strong [ref=e188]: HIGH_PERFORMER
+                    - text: ", priorizando as de"
+                    - strong [ref=e189]: maior volume
+                    - text: e CPL baixo -
+                    - strong [ref=e190]: MODERATE com CPL bom
+                    - text: ", mas que precisam estabilizar/ganhar volume --- ## Ordem de execução (bem direta) 1)"
+                    - strong [ref=e191]:
+                      - text: Escalar
+                      - code [ref=e192]: "`120230804266050206`"
+                      - text: (+75%)
+                    - text: 2)
+                    - strong [ref=e193]:
+                      - text: Cortar
+                      - code [ref=e194]: "`120234212518590206`"
+                      - text: (-50%)
+                    - text: 3)
+                    - strong [ref=e195]:
+                      - text: Aumentar
+                      - code [ref=e196]: "`120234039490540206`"
+                      - text: e
+                      - code [ref=e197]: "`120234212879790206`"
+                      - text: (+25% cada)
+                    - text: 4)
+                    - strong [ref=e198]:
+                      - text: Revisar público de
+                      - code [ref=e199]: "`120237856444700206`"
+                    - text: 5)
+                    - strong [ref=e200]:
+                      - text: Reduzir
+                      - code [ref=e201]: "`120233891992660206`"
+                      - text: (-30%)
+                    - text: e reavaliar em 48–72h 6)
+                    - strong [ref=e202]: "Limpar o portfólio:"
+                    - text: pausar/restringir
+                    - strong [ref=e203]: UNDERPERFORMER
+                    - text: e campanhas com
+                    - strong [ref=e204]: 0 leads
+                    - text: "até corrigir tracking/funil --- ## O que eu preciso de você para fechar a realocação “no número” -"
+                    - strong [ref=e205]: Objetivo principal
+                    - text: (Leads / WhatsApp / Vendas) -
+                    - strong [ref=e206]: Budget atual
+                    - text: (diário) dessas campanhas - Seu
+                    - strong [ref=e207]: CPL alvo
+                    - text: "(ex.: “até"
+                    - strong [ref=e208]: R$ X
+                    - text: ”) Com isso, eu te devolvo um plano de
+                    - strong [ref=e209]: quanto tirar de cada campanha e para onde mover
+                    - text: ", maximizando volume sem estourar o CPL."
+              - generic [ref=e109]:
+                - textbox "Pergunte sobre suas campanhas..." [ref=e110]
+                - button "Enviar" [disabled]:
+                  - img
+  - region "Notifications alt+T"
+  - alert [ref=e50]

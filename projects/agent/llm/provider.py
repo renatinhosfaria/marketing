@@ -51,10 +51,22 @@ def get_model(role: str, config: dict = None):
     model_name = model_map.get(role, agent_settings.analyst_model)
     provider = agent_settings.default_provider
 
-    kwargs = {}
+    # Timeout por role: supervisor precisa de resposta rapida
+    timeout = (
+        agent_settings.supervisor_timeout
+        if role == "supervisor"
+        else agent_settings.llm_timeout
+    )
+
+    # Streaming habilitado apenas para synthesizer (tokens fluem via SSE)
+    streaming = role == "synthesizer"
+
+    kwargs = {"timeout": timeout}
     if provider == "openai" and agent_settings.openai_api_key:
         kwargs["api_key"] = agent_settings.openai_api_key
     elif provider == "anthropic" and agent_settings.anthropic_api_key:
         kwargs["api_key"] = agent_settings.anthropic_api_key
 
-    return init_chat_model(model_name, model_provider=provider, **kwargs)
+    return init_chat_model(
+        model_name, model_provider=provider, streaming=streaming, **kwargs
+    )

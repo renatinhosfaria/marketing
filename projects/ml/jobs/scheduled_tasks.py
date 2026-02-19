@@ -98,11 +98,12 @@ async def _run_compute_features_for_config(config_id: int, window_days: int = 30
         }
 
 
-async def _run_forecasts_for_config(config_id: int, window_days: int = 30, session_maker=None) -> dict:
+async def _run_forecasts_for_config(config_id: int, window_days: int = 90, session_maker=None) -> dict:
     from projects.ml.db.repositories.insights_repo import InsightsRepository
     from projects.ml.db.repositories.ml_repo import MLRepository
     from projects.ml.services.data_service import DataService
-    from projects.ml.algorithms.models.timeseries.forecaster import forecaster
+    from projects.ml.algorithms.models.timeseries.ensemble_forecaster import get_ensemble_forecaster
+    from projects.ml.algorithms.models.timeseries.forecaster import get_forecaster
     from shared.config import settings
 
     if session_maker is None:
@@ -120,6 +121,15 @@ async def _run_forecasts_for_config(config_id: int, window_days: int = 30, sessi
         generated = 0
         skipped = 0
         insufficient = 0
+
+        # Criar EnsembleForecaster com fallback para forecaster simples
+        try:
+            ensemble = get_ensemble_forecaster(include_prophet=True)
+        except Exception:
+            ensemble = None
+            logger.warning("EnsembleForecaster indisponível, usando forecaster simples")
+
+        fallback = get_forecaster(method='auto')
 
         for campaign in campaigns:
             # O nome da campanha já está disponível no objeto campaign
@@ -146,24 +156,25 @@ async def _run_forecasts_for_config(config_id: int, window_days: int = 30, sessi
                         entity_id=campaign.campaign_id,
                         target_metric="cpl",
                         horizon_days=horizon_days,
-                        method=forecaster.method,
+                        method="ensemble",
                         predictions=[],
                         forecast_date=forecast_date,
                         window_days=window_days,
-                        model_version=forecaster.model_version,
+                        model_version="1.0.0",
                         insufficient_data=True,
                         campaign_name=campaign_name,
                     )
                     insufficient += 1
                 continue
 
-            metrics = [
-                ("cpl", forecaster.forecast_cpl),
-                ("leads", forecaster.forecast_leads),
-                ("spend", forecaster.forecast_spend),
-            ]
+            # Calibrar pesos do ensemble se houver dados suficientes
+            if ensemble and len(df) > 21:
+                try:
+                    ensemble.calibrate_weights(df, 'spend', validation_days=min(14, len(df) // 3))
+                except Exception:
+                    pass  # Usa pesos iguais
 
-            for metric_name, fn in metrics:
+            for metric_name in ("cpl", "leads", "spend"):
                 exists = await ml_repo.forecast_exists(
                     config_id=config_id,
                     entity_type="campaign",
@@ -176,16 +187,26 @@ async def _run_forecasts_for_config(config_id: int, window_days: int = 30, sessi
                     skipped += 1
                     continue
 
-                try:
-                    series = fn(
-                        df,
-                        "campaign",
-                        campaign.campaign_id,
-                        horizon_days=horizon_days,
-                    )
-                except Exception:
-                    insufficient += 1
-                    continue
+                series = None
+                # Tentar ensemble primeiro, fallback para forecaster simples
+                if ensemble:
+                    try:
+                        series = ensemble.forecast(
+                            df, metric_name, "campaign",
+                            campaign.campaign_id, horizon_days,
+                        )
+                    except Exception:
+                        series = None
+
+                if series is None:
+                    try:
+                        series = fallback.forecast(
+                            df, metric_name, "campaign",
+                            campaign.campaign_id, horizon_days,
+                        )
+                    except Exception:
+                        insufficient += 1
+                        continue
 
                 predictions = []
                 for item in series.forecasts:
@@ -206,7 +227,7 @@ async def _run_forecasts_for_config(config_id: int, window_days: int = 30, sessi
                     predictions=predictions,
                     forecast_date=forecast_date,
                     window_days=window_days,
-                    model_version=forecaster.model_version,
+                    model_version="1.0.0",
                     insufficient_data=False,
                     campaign_name=campaign_name,
                 )
@@ -782,47 +803,144 @@ def batch_predictions():
 def validate_predictions():
     """
     Valida previsões anteriores com valores reais.
+    Busca previsões com forecast_date no passado e actual_value=NULL,
+    consulta insights_history para obter o valor real e atualiza.
     Executado diariamente às 08:00.
     """
-    from sqlalchemy.orm import sessionmaker
-    from projects.ml.db.models import MLPrediction
+    from shared.db.session import create_isolated_async_session_maker
 
     logger.info("Iniciando validação de previsões")
 
-    Session = sessionmaker(bind=sync_engine)
-    session = Session()
+    isolated_engine, isolated_session_maker = create_isolated_async_session_maker()
 
     try:
-        # Buscar previsões de ontem que ainda não foram validadas
-        yesterday = datetime.utcnow().date() - timedelta(days=1)
-
-        predictions = session.query(MLPrediction).filter(
-            MLPrediction.forecast_date >= yesterday,
-            MLPrediction.forecast_date < datetime.utcnow().date(),
-            MLPrediction.actual_value.is_(None)
-        ).all()
-
-        validated_count = 0
-        for prediction in predictions:
-            # TODO: Buscar valor real e atualizar previsão
-            logger.debug(
-                "Validando previsão",
-                prediction_id=prediction.id,
-                entity_id=prediction.entity_id
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(
+                _validate_predictions_async(isolated_session_maker)
             )
+            loop.run_until_complete(isolated_engine.dispose())
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
 
         logger.info(
             "Validação de previsões concluída",
-            predictions_validated=validated_count
+            validated=result["validated"],
+            no_data=result["no_data"],
         )
 
-        return {
-            "status": "completed",
-            "predictions_validated": validated_count
-        }
+        return {"status": "completed", **result}
 
-    finally:
-        session.close()
+    except Exception as e:
+        logger.error("Erro na validação de previsões", error=str(e), exc_info=True)
+        raise
+
+
+async def _validate_predictions_async(session_maker) -> dict:
+    """
+    Busca previsões pendentes e compara com valores reais do insights_history.
+    """
+    from sqlalchemy import select, and_, func, cast, Date
+    from projects.ml.db.models import MLPrediction, PredictionType
+    from projects.ml.db.repositories.ml_repo import MLRepository
+    from shared.db.models.famachat_readonly import SistemaFacebookAdsInsightsHistory
+
+    # Mapeamento prediction_type -> coluna de insights
+    METRIC_MAP = {
+        PredictionType.CPL_FORECAST: None,  # CPL é derivado (spend/leads)
+        PredictionType.LEADS_FORECAST: "leads",
+        PredictionType.SPEND_FORECAST: "spend",
+    }
+
+    async with session_maker() as session:
+        ml_repo = MLRepository(session)
+
+        # Buscar previsões com data passada (até 30 dias atrás) sem validação
+        cutoff = datetime.utcnow().date() - timedelta(days=30)
+        today = datetime.utcnow().date()
+
+        result = await session.execute(
+            select(MLPrediction).where(
+                and_(
+                    MLPrediction.forecast_date >= cutoff,
+                    MLPrediction.forecast_date < today,
+                    MLPrediction.actual_value.is_(None),
+                )
+            )
+        )
+        predictions = result.scalars().all()
+
+        validated = 0
+        no_data = 0
+
+        for pred in predictions:
+            # Determinar coluna da métrica
+            metric_col = METRIC_MAP.get(pred.prediction_type)
+
+            # Determinar filtro de entidade
+            entity_filter = None
+            if pred.entity_type == "campaign":
+                entity_filter = SistemaFacebookAdsInsightsHistory.campaign_id == pred.entity_id
+            elif pred.entity_type == "adset":
+                entity_filter = SistemaFacebookAdsInsightsHistory.adset_id == pred.entity_id
+            elif pred.entity_type == "ad":
+                entity_filter = SistemaFacebookAdsInsightsHistory.ad_id == pred.entity_id
+
+            if entity_filter is None:
+                continue
+
+            # Buscar valor real para a data prevista
+            pred_date = pred.forecast_date.date() if hasattr(pred.forecast_date, 'date') else pred.forecast_date
+
+            if pred.prediction_type == PredictionType.CPL_FORECAST:
+                # CPL = spend / leads
+                q = select(
+                    func.sum(SistemaFacebookAdsInsightsHistory.spend).label('spend'),
+                    func.sum(SistemaFacebookAdsInsightsHistory.leads).label('leads'),
+                ).where(
+                    and_(
+                        SistemaFacebookAdsInsightsHistory.config_id == pred.config_id,
+                        entity_filter,
+                        cast(SistemaFacebookAdsInsightsHistory.date, Date) == pred_date,
+                    )
+                )
+            else:
+                col = getattr(SistemaFacebookAdsInsightsHistory, metric_col)
+                q = select(
+                    func.sum(col).label('value'),
+                ).where(
+                    and_(
+                        SistemaFacebookAdsInsightsHistory.config_id == pred.config_id,
+                        entity_filter,
+                        cast(SistemaFacebookAdsInsightsHistory.date, Date) == pred_date,
+                    )
+                )
+
+            row = (await session.execute(q)).first()
+
+            actual_value = None
+            if pred.prediction_type == PredictionType.CPL_FORECAST:
+                if row and row.spend and row.leads and row.leads > 0:
+                    actual_value = float(row.spend) / float(row.leads)
+            else:
+                if row and row.value is not None:
+                    actual_value = float(row.value)
+
+            if actual_value is not None:
+                await ml_repo.update_prediction_actual(pred.id, actual_value)
+                validated += 1
+            else:
+                no_data += 1
+
+        await session.commit()
+
+        return {
+            "validated": validated,
+            "no_data": no_data,
+            "total_checked": len(predictions),
+        }
 
 
 # ==================== MULTI-LEVEL HELPER FUNCTIONS ====================

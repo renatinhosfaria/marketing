@@ -1,0 +1,44 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/alert_rules.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  - job_name: "ml-api"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["marketing-api:8000"]
+        labels:
+          service: ml-api
+          env: production
+
+  - job_name: "fb-ads-api"
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["marketing-fb-ads:8002"]
+        labels:
+          service: fb-ads-api
+          env: production
+
+  - job_name: "redis-exporter"
+    static_configs:
+      - targets: ["redis-exporter:9121"]
+
+  - job_name: "postgres-exporter"
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+
+  - job_name: "otel-collector"
+    static_configs:
+      - targets: ["otel-collector:8888"]
+
+  - job_name: "otel-collector-metrics"
+    static_configs:
+      - targets: ["otel-collector:8889"]

@@ -1,0 +1,112 @@
+groups:
+  - name: api_alerts
+    rules:
+      - alert: APIHighLatency
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, handler)) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API p95 latency > 2s por 10m"
+          description: "Handler {{ $labels.handler }} com p95={{ $value }}s"
+
+      - alert: APICriticalLatency
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, handler)) > 5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API p95 latency > 5s por 5m"
+          description: "Handler {{ $labels.handler }} com p95={{ $value }}s"
+
+      - alert: APIHighErrorRate
+        expr: >
+          sum(rate(http_requests_total{status=~"5.."}[5m])) by (handler)
+          /
+          sum(rate(http_requests_total[5m])) by (handler)
+          > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Error rate > 5% por 5m"
+          description: "Handler {{ $labels.handler }} com error_rate={{ $value | humanizePercentage }}"
+
+      - alert: APIHighInFlightRequests
+        expr: http_requests_in_progress > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Mais de 50 requests em andamento por 5m"
+
+  - name: celery_alerts
+    rules:
+      - alert: CeleryHighFailureRate
+        expr: sum(rate(celery_tasks_total{status="failure"}[10m])) by (queue) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Celery task failures > 0.1/s na fila {{ $labels.queue }}"
+
+      - alert: CeleryTaskDurationHigh
+        expr: histogram_quantile(0.95, sum(rate(celery_task_duration_seconds_bucket[10m])) by (le, task_name)) > 300
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Celery task p95 duration > 5min"
+          description: "Task {{ $labels.task_name }} com p95={{ $value }}s"
+
+      - alert: CeleryWorkerDown
+        expr: celery_workers_active == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Nenhum worker Celery ativo por 5m"
+
+  - name: sse_alerts
+    rules:
+      - alert: SSEHighDisconnectRate
+        expr: rate(sse_client_disconnects_total[10m]) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SSE disconnect rate > 0.1/s por 10m"
+
+  - name: infra_alerts
+    rules:
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL indisponivel por 2m"
+
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis indisponivel por 2m"
+
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis usando > 85% da memoria por 10m"
+
+      - alert: RedisHighLatency
+        expr: redis_commands_duration_seconds_total / redis_commands_processed_total > 0.01
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis latencia media > 10ms por 5m"

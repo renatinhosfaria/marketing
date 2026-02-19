@@ -1,277 +1,139 @@
 """
-Tools para acesso a previsões de métricas.
+Tools do Cientista de Previsao.
+
+Todas as tools usam ML API via HTTP (Prophet + Ensemble).
+Retornam ToolResult padronizado.
 """
 
-from typing import Optional
+from typing import Literal, Optional
+
 from langchain_core.tools import tool
-from sqlalchemy import select, desc, and_
-from datetime import datetime, timedelta
+from langchain_core.runnables import RunnableConfig
 
-from shared.db.session import get_db_session
-from shared.db.models.ml_readonly import MLForecast, PredictionType
-from shared.core.logging import get_logger
-from projects.agent.tools.base import format_currency, format_number
-
-logger = get_logger(__name__)
+from projects.agent.tools.result import ToolResult, tool_error
+from projects.agent.tools.http_client import _ml_api_call
+from projects.agent.tools.config_resolver import resolve_config_id
+from projects.agent.tools.ownership import _validate_entity_ownership
+from projects.agent.config import agent_settings
 
 
 @tool
-def get_forecasts(
-    config_id: int,
-    forecast_type: Optional[str] = None,
-    days_ahead: int = 7,
-    limit: int = 30
-) -> dict:
-    """
-    Lista previsões de métricas para as campanhas.
-
-    Use esta ferramenta para obter previsões de CPL, leads ou spend
-    para os próximos dias.
+async def generate_forecast(
+    entity_id: str,
+    entity_type: Literal["campaign", "adset", "ad"] = "campaign",
+    metric: str = "cpl",
+    horizon_days: int = 7,
+    config: RunnableConfig = None,
+) -> ToolResult:
+    """Gera previsao (Prophet + Ensemble) para N dias.
 
     Args:
-        config_id: ID da configuração Facebook Ads
-        forecast_type: Tipo de métrica (cpl, leads, spend) ou None para todos
-        days_ahead: Dias à frente para considerar (padrão: 7)
-        limit: Número máximo de forecasts (padrão: 30)
-
-    Returns:
-        Lista de previsões com intervalos de confiança
+        entity_id: ID da entidade (campanha, adset, ad).
+        entity_type: Nivel de entidade (campaign, adset, ad).
+        metric: Metrica a prever (cpl, leads).
+        horizon_days: Horizonte de previsao em dias (default: 7).
     """
-    try:
-        with get_db_session() as db:
-            today = datetime.utcnow().date()
-            end_date = today + timedelta(days=days_ahead)
+    cfg = (config or {}).get("configurable", {})
+    account_id = cfg.get("account_id")
 
-            query = select(MLForecast).where(
-                MLForecast.config_id == config_id,
-                MLForecast.forecast_date >= today,
-                MLForecast.forecast_date <= end_date
-            )
+    config_id = await resolve_config_id(account_id)
+    if config_id is None:
+        return tool_error("NOT_FOUND", f"Conta {account_id} nao encontrada.")
 
-            # Filtrar por métrica se especificado
-            if forecast_type:
-                metric = forecast_type.lower().replace("_forecast", "")
-                query = query.where(MLForecast.target_metric == metric)
+    if not await _validate_entity_ownership(entity_id, config_id, entity_type):
+        return tool_error(
+            "OWNERSHIP_ERROR",
+            f"Entidade {entity_id} nao encontrada nesta conta.",
+        )
 
-            query = query.order_by(
-                MLForecast.forecast_date,
-                desc(MLForecast.created_at)
-            ).limit(limit)
+    supported_metrics = {"cpl", "leads"}
+    if not agent_settings.enable_ml_endpoint_fixes:
+        supported_metrics.add("spend")
 
-            results = db.execute(query).scalars().all()
+    if metric not in supported_metrics:
+        return tool_error(
+            "NOT_SUPPORTED",
+            f"Metrica '{metric}' nao suportada no endpoint atual de previsoes.",
+        )
 
-            forecasts = []
-            metric_summaries = {}
-
-            for forecast_row in results:
-                metric = forecast_row.target_metric
-
-                # Processar predictions JSON
-                if forecast_row.predictions:
-                    for pred in forecast_row.predictions:
-                        pred_value = pred.get("predicted_value", 0)
-
-                        # Acumular para sumário
-                        if metric not in metric_summaries:
-                            metric_summaries[metric] = {
-                                "count": 0,
-                                "values": [],
-                                "campaigns": set()
-                            }
-                        metric_summaries[metric]["count"] += 1
-                        metric_summaries[metric]["values"].append(pred_value)
-                        metric_summaries[metric]["campaigns"].add(forecast_row.entity_id)
-
-                        forecasts.append({
-                            "id": forecast_row.id,
-                            "campaign_id": forecast_row.entity_id,
-                            "type": metric.upper(),
-                            "forecast_date": pred.get("date", "")[:10] if pred.get("date") else None,
-                            "predicted_value": round(pred_value, 2),
-                            "lower_bound": round(pred.get("confidence_lower", 0), 2),
-                            "upper_bound": round(pred.get("confidence_upper", 0), 2),
-                            "method": forecast_row.method,
-                            "model_version": forecast_row.model_version,
-                        })
-
-            # Construir sumário por métrica
-            summary_parts = []
-            for metric, data in metric_summaries.items():
-                avg_value = sum(data["values"]) / len(data["values"]) if data["values"] else 0
-                if metric == "cpl":
-                    summary_parts.append(f"CPL médio previsto: {format_currency(avg_value)}")
-                elif metric == "leads":
-                    summary_parts.append(f"Leads previstos: {format_number(sum(data['values']))}")
-                elif metric == "spend":
-                    summary_parts.append(f"Spend previsto: {format_currency(sum(data['values']))}")
-
-            return {
-                "total": len(forecasts),
-                "days_ahead": days_ahead,
-                "forecasts": forecasts,
-                "summary": "; ".join(summary_parts) if summary_parts else "Sem previsões disponíveis."
-            }
-    except Exception as e:
-        logger.error("Erro ao buscar previsões", error=str(e))
-        return {"error": str(e), "forecasts": []}
+    endpoint = f"/api/v1/predictions/{metric}"
+    return await _ml_api_call(
+        "post",
+        endpoint,
+        json={
+            "config_id": config_id,
+            "entity_id": entity_id,
+            "horizon_days": horizon_days,
+        },
+        account_id=account_id,
+        timeout=30,
+    )
 
 
 @tool
-def predict_campaign_cpl(
-    config_id: int,
-    campaign_id: str,
-    days_ahead: int = 7
-) -> dict:
-    """
-    Retorna previsão de CPL para uma campanha específica.
-
-    Use esta ferramenta para saber qual será o CPL estimado
-    de uma campanha nos próximos dias.
+async def get_forecast_history(
+    entity_type: Literal["campaign", "adset", "ad"] = "campaign",
+    entity_id: Optional[str] = None,
+    config: RunnableConfig = None,
+) -> ToolResult:
+    """Previsoes anteriores com acuracia real (previsto vs realizado).
 
     Args:
-        config_id: ID da configuração Facebook Ads
-        campaign_id: ID da campanha
-        days_ahead: Dias à frente para prever (padrão: 7)
-
-    Returns:
-        Previsões de CPL dia a dia com intervalos de confiança
+        entity_type: Nivel de entidade (campaign, adset, ad).
+        entity_id: ID da entidade.
     """
-    try:
-        with get_db_session() as db:
-            today = datetime.utcnow().date()
-            end_date = today + timedelta(days=days_ahead)
+    cfg = (config or {}).get("configurable", {})
+    account_id = cfg.get("account_id")
 
-            forecast_row = db.execute(
-                select(MLForecast).where(
-                    MLForecast.config_id == config_id,
-                    MLForecast.entity_id == campaign_id,
-                    MLForecast.target_metric == "cpl",
-                    MLForecast.forecast_date >= today,
-                    MLForecast.forecast_date <= end_date
-                ).order_by(MLForecast.forecast_date)
-            ).scalar()
+    config_id = await resolve_config_id(account_id)
+    if config_id is None:
+        return tool_error("NOT_FOUND", f"Conta {account_id} nao encontrada.")
 
-            if not forecast_row or not forecast_row.predictions:
-                return {
-                    "found": False,
-                    "campaign_id": campaign_id,
-                    "message": f"Sem previsões de CPL disponíveis para a campanha {campaign_id}."
-                }
+    if agent_settings.enable_ml_endpoint_fixes:
+        path = "/api/v1/forecasts"
+        params = {
+            "config_id": config_id,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+        }
+    else:
+        path = f"/api/v1/predictions/series/{entity_type}/{entity_id}"
+        params = {"config_id": config_id}
 
-            predictions = []
-            total_cpl = 0
-
-            # Processar cada dia do JSON predictions
-            for pred in forecast_row.predictions:
-                pred_value = pred.get("predicted_value", 0)
-                lower = pred.get("confidence_lower", 0)
-                upper = pred.get("confidence_upper", 0)
-
-                predictions.append({
-                    "date": pred.get("date", "")[:10] if pred.get("date") else "",
-                    "predicted_cpl": format_currency(pred_value),
-                    "range": f"{format_currency(lower)} - {format_currency(upper)}" if upper > 0 else "N/A",
-                    "raw_value": round(pred_value, 2),
-                })
-                total_cpl += pred_value
-
-            avg_cpl = total_cpl / len(predictions) if predictions else 0
-            trend = "estável"
-            if len(predictions) >= 2:
-                first_val = predictions[0]["raw_value"]
-                last_val = predictions[-1]["raw_value"]
-                if last_val > first_val * 1.1:
-                    trend = "subindo 📈"
-                elif last_val < first_val * 0.9:
-                    trend = "caindo 📉"
-
-            return {
-                "found": True,
-                "campaign_id": campaign_id,
-                "days_ahead": days_ahead,
-                "predictions": predictions,
-                "average_cpl": format_currency(avg_cpl),
-                "trend": trend,
-                "summary": f"CPL médio previsto para os próximos {days_ahead} dias: {format_currency(avg_cpl)} ({trend})."
-            }
-    except Exception as e:
-        logger.error("Erro ao prever CPL", error=str(e), campaign_id=campaign_id)
-        return {"error": str(e), "found": False}
+    return await _ml_api_call(
+        "get",
+        path,
+        account_id=account_id,
+        params=params,
+    )
 
 
 @tool
-def predict_campaign_leads(
-    config_id: int,
-    campaign_id: str,
-    days_ahead: int = 7
-) -> dict:
-    """
-    Retorna previsão de leads para uma campanha específica.
-
-    Use esta ferramenta para estimar quantos leads uma campanha
-    deve gerar nos próximos dias.
+async def validate_forecast(
+    forecast_id: str,
+    config: RunnableConfig = None,
+) -> ToolResult:
+    """Compara previsao passada com resultado real (MAPE, MAE).
 
     Args:
-        config_id: ID da configuração Facebook Ads
-        campaign_id: ID da campanha
-        days_ahead: Dias à frente para prever (padrão: 7)
-
-    Returns:
-        Previsões de leads dia a dia com total estimado
+        forecast_id: ID da previsao a validar.
     """
-    try:
-        with get_db_session() as db:
-            today = datetime.utcnow().date()
-            end_date = today + timedelta(days=days_ahead)
+    cfg = (config or {}).get("configurable", {})
+    account_id = cfg.get("account_id")
 
-            forecast_row = db.execute(
-                select(MLForecast).where(
-                    MLForecast.config_id == config_id,
-                    MLForecast.entity_id == campaign_id,
-                    MLForecast.target_metric == "leads",
-                    MLForecast.forecast_date >= today,
-                    MLForecast.forecast_date <= end_date
-                ).order_by(MLForecast.forecast_date)
-            ).scalar()
+    config_id = await resolve_config_id(account_id)
+    if config_id is None:
+        return tool_error("NOT_FOUND", f"Conta {account_id} nao encontrada.")
 
-            if not forecast_row or not forecast_row.predictions:
-                return {
-                    "found": False,
-                    "campaign_id": campaign_id,
-                    "message": f"Sem previsões de leads disponíveis para a campanha {campaign_id}."
-                }
+    if agent_settings.enable_ml_endpoint_fixes:
+        return tool_error(
+            "NOT_SUPPORTED",
+            "Validacao de forecast ainda nao esta disponivel no backend ML.",
+        )
 
-            predictions = []
-            total_leads = 0
-            total_lower = 0
-            total_upper = 0
-
-            # Processar cada dia do JSON predictions
-            for pred in forecast_row.predictions:
-                leads = int(round(pred.get("predicted_value", 0)))
-                lower = int(round(pred.get("confidence_lower", 0)))
-                upper = int(round(pred.get("confidence_upper", 0)))
-
-                predictions.append({
-                    "date": pred.get("date", "")[:10] if pred.get("date") else "",
-                    "predicted_leads": leads,
-                    "range": f"{lower} - {upper}" if upper > 0 else "N/A",
-                })
-                total_leads += leads
-                total_lower += lower if lower > 0 else leads
-                total_upper += upper if upper > 0 else leads
-
-            return {
-                "found": True,
-                "campaign_id": campaign_id,
-                "days_ahead": days_ahead,
-                "predictions": predictions,
-                "total_predicted": total_leads,
-                "total_range": f"{total_lower} - {total_upper}",
-                "daily_average": round(total_leads / len(predictions), 1) if predictions else 0,
-                "summary": f"Previsão de {total_leads} leads nos próximos {days_ahead} dias "
-                          f"(média de {round(total_leads / days_ahead, 1)} leads/dia)."
-            }
-    except Exception as e:
-        logger.error("Erro ao prever leads", error=str(e), campaign_id=campaign_id)
-        return {"error": str(e), "found": False}
+    return await _ml_api_call(
+        "get",
+        f"/api/v1/forecasts/{forecast_id}/validate",
+        account_id=account_id,
+        params={"config_id": config_id},
+    )

@@ -1,6 +1,6 @@
 """
 Modelos SQLAlchemy READ-ONLY para tabelas de ML.
-Usados pelo Agent para leitura de dados produzidos pelo ML.
+Usados para leitura de dados produzidos pelo ML.
 
 IMPORTANTE: Estes modelos são duplicatas somente-leitura dos modelos canônicos
 em projects/ml/db/models.py. Quando o schema ML mudar, atualizar AMBOS os arquivos.
@@ -94,10 +94,10 @@ class JobStatus(str, enum.Enum):
 
 # ==================== MODELOS READ-ONLY ====================
 # Nota: Não incluem relationships de escrita nem back_populates.
-# O Agent só lê estes dados, nunca escreve.
+# Modelos somente-leitura; não escrevem no banco.
 
 class MLPrediction(Base):
-    """Previsões geradas pelos modelos (READ-ONLY para Agent)."""
+    """Previsões geradas pelos modelos (READ-ONLY)."""
     __tablename__ = "ml_predictions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -133,12 +133,14 @@ class MLPrediction(Base):
 
 
 class MLCampaignClassification(Base):
-    """Classificação de campanhas por tier (READ-ONLY para Agent)."""
-    __tablename__ = "ml_campaign_classifications"
+    """Classificação de entidades por tier (READ-ONLY)."""
+    __tablename__ = "ml_classifications"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     config_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    campaign_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    entity_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    parent_id: Mapped[Optional[str]] = mapped_column(String(100))
     tier: Mapped[CampaignTier] = mapped_column(
         Enum(CampaignTier), nullable=False
     )
@@ -155,18 +157,24 @@ class MLCampaignClassification(Base):
     valid_until: Mapped[Optional[datetime]] = mapped_column(DateTime)
     model_version: Mapped[Optional[str]] = mapped_column(String(50))
 
+    @property
+    def campaign_id(self) -> str:
+        """Alias para retrocompatibilidade com tools que usam campaign_id."""
+        return self.entity_id
+
     __table_args__ = (
         Index(
-            "ix_ml_classifications_campaign",
-            "config_id", "campaign_id", "classified_at"
+            "ix_ml_classifications_entity",
+            "config_id", "entity_type", "entity_id", "classified_at"
         ),
         Index("ix_ml_classifications_tier", "config_id", "tier"),
+        Index("ix_ml_classifications_parent", "config_id", "parent_id"),
         {"extend_existing": True},
     )
 
 
 class MLRecommendation(Base):
-    """Recomendações de otimização (READ-ONLY para Agent)."""
+    """Recomendações de otimização (READ-ONLY)."""
     __tablename__ = "ml_recommendations"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -207,7 +215,7 @@ class MLRecommendation(Base):
 
 
 class MLAnomaly(Base):
-    """Anomalias detectadas (READ-ONLY para Agent)."""
+    """Anomalias detectadas (READ-ONLY)."""
     __tablename__ = "ml_anomalies"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -233,6 +241,9 @@ class MLAnomaly(Base):
     recommendation_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("ml_recommendations.id", ondelete="SET NULL")
     )
+    campaign_name: Mapped[Optional[str]] = mapped_column(String(255))
+    adset_name: Mapped[Optional[str]] = mapped_column(String(255))
+    ad_name: Mapped[Optional[str]] = mapped_column(String(255))
 
     __table_args__ = (
         Index(
@@ -246,7 +257,7 @@ class MLAnomaly(Base):
 
 
 class MLForecast(Base):
-    """Forecasts de métricas (READ-ONLY para Agent)."""
+    """Forecasts de métricas (READ-ONLY)."""
     __tablename__ = "ml_forecasts"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

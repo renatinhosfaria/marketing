@@ -26,7 +26,7 @@ def test_log_orchestrator_request_received():
         log_orchestrator_request_received(
             user_id=123,
             config_id=1,
-            path="/api/v1/agent/chat",
+            path="/api/v1/health",
             method="POST",
             ip="192.168.1.1",
             user_agent="Mozilla/5.0"

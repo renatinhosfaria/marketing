@@ -1,0 +1,86 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - img [ref=e7]
+          - generic [ref=e9]: Marketing
+        - button [ref=e10]:
+          - img [ref=e11]
+      - navigation [ref=e14]:
+        - link "Facebook Ads" [ref=e15] [cursor=pointer]:
+          - /url: /app/facebook-ads
+          - img [ref=e16]
+          - text: Facebook Ads
+        - link "ML Analytics" [ref=e18] [cursor=pointer]:
+          - /url: /app/ml
+          - img [ref=e19]
+          - text: ML Analytics
+        - link "Agente IA" [ref=e29] [cursor=pointer]:
+          - /url: /app/ai-agent
+          - img [ref=e30]
+          - text: Agente IA
+      - generic [ref=e34]:
+        - generic [ref=e36]: AD
+        - generic [ref=e37]:
+          - paragraph [ref=e38]: Administrador
+          - paragraph [ref=e39]: Gestor
+    - generic [ref=e40]:
+      - banner [ref=e41]:
+        - heading "Agente IA" [level=1] [ref=e42]
+      - main [ref=e43]:
+        - generic [ref=e45]:
+          - generic [ref=e51]:
+            - generic [ref=e52]:
+              - img [ref=e53]
+              - generic [ref=e56]:
+                - heading "Agente de Trafego Pago" [level=1] [ref=e57]
+                - paragraph [ref=e58]: Analises e recomendacoes em tempo real
+            - generic [ref=e59]:
+              - generic [ref=e62]: Online
+              - combobox [ref=e63]:
+                - option "Famachat (act_24036721645944375)" [selected]
+              - button "Debug" [ref=e64]:
+                - img
+                - generic [ref=e65]: Debug
+          - generic [ref=e66]:
+            - complementary [ref=e68]:
+              - generic [ref=e69]:
+                - heading "Conversas" [level=3] [ref=e70]
+                - button "Nova conversa" [ref=e71]:
+                  - img
+              - generic [ref=e73]:
+                - button "Compare minhas top 3 campanhas 2 mensagens 10/02" [ref=e74]:
+                  - generic [ref=e75]: Compare minhas top 3 campanhas
+                  - generic [ref=e76]:
+                    - generic [ref=e77]: 2 mensagens
+                    - generic [ref=e78]: 10/02
+                - button "Excluir conversa" [ref=e79]:
+                  - img
+            - generic [ref=e81]:
+              - generic [ref=e82]:
+                - generic [ref=e83]:
+                  - img [ref=e84]
+                  - heading "Assistente de Tráfego Pago" [level=2] [ref=e87]
+                - generic [ref=e88]:
+                  - button "Nova conversa" [ref=e89]:
+                    - img
+                  - button "Limpar conversa" [ref=e90]:
+                    - img
+              - generic [ref=e94]:
+                - img [ref=e95]
+                - heading "Assistente de Tráfego Pago" [level=3] [ref=e98]
+                - paragraph [ref=e99]: Faça perguntas sobre campanhas, recomendações e previsões com base nos seus dados de Facebook Ads.
+                - generic [ref=e101]:
+                  - button "Qual campanha está com o melhor CPL?" [ref=e102]
+                  - button "Mostre anomalias críticas de hoje" [ref=e103]
+                  - button "Quais recomendações devo seguir?" [ref=e104]
+                  - button "Compare minhas top 3 campanhas" [ref=e105]
+                  - button "Previsão de leads para próxima semana" [ref=e106]
+                  - button "Qual campanha devo pausar?" [ref=e107]
+              - generic [ref=e109]:
+                - textbox "Pergunte sobre suas campanhas..." [ref=e110]
+                - button "Enviar" [disabled]:
+                  - img
+  - region "Notifications alt+T"
+  - alert [ref=e50]

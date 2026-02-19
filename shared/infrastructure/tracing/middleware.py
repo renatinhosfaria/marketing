@@ -27,7 +27,13 @@ class TraceMiddleware(BaseHTTPMiddleware):
     3. Loga request received e response sent
     """
 
+    EXCLUDED_PATHS = frozenset({"/health", "/api/health", "/api/v1/agent/health"})
+
     async def dispatch(self, request: Request, call_next):
+        # Skip tracing para health checks (evita poluir logs)
+        if request.url.path in self.EXCLUDED_PATHS:
+            return await call_next(request)
+
         # 1. Captura ou gera trace_id
         trace_id = request.headers.get("X-Trace-ID") or generate_trace_id()
         root_span_id = generate_span_id()

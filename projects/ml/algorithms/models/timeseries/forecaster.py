@@ -20,6 +20,18 @@ from shared.core.logging import get_logger
 
 logger = get_logger(__name__)
 
+# Diretório de parâmetros Prophet tunados
+_PROPHET_PARAMS_DIR = None
+
+def _get_prophet_params_dir():
+    """Retorna diretório de params Prophet (lazy load)."""
+    global _PROPHET_PARAMS_DIR
+    if _PROPHET_PARAMS_DIR is None:
+        from shared.config import settings
+        from pathlib import Path
+        _PROPHET_PARAMS_DIR = Path(settings.models_storage_path) / "prophet_params"
+    return _PROPHET_PARAMS_DIR
+
 # Tentar importar Prophet
 try:
     from prophet import Prophet
@@ -144,8 +156,22 @@ class TimeSeriesForecaster:
         df = df.sort_values('date').reset_index(drop=True)
         df = df[['date', metric]].dropna()
 
+        # Filtrar dias com valor zero para métricas de performance
+        # Dias com spend=0 indicam campanha pausada e distorcem previsões
+        if metric in ('spend', 'cpl', 'leads'):
+            total_before = len(df)
+            df = df[df[metric] > 0].reset_index(drop=True)
+            removed = total_before - len(df)
+            if removed > 0:
+                logger.info(
+                    "Zeros removidos do treino",
+                    metric=metric,
+                    removed=removed,
+                    remaining=len(df),
+                )
+
         if len(df) < 7:
-            raise ValueError(f"Dados insuficientes após remover NaN. Mínimo: 7, encontrado: {len(df)}")
+            raise ValueError(f"Dados insuficientes após remover NaN/zeros. Mínimo: 7, encontrado: {len(df)}")
 
         # Escolher método
         if self.method == 'prophet' and PROPHET_AVAILABLE:
@@ -170,6 +196,33 @@ class TimeSeriesForecaster:
             created_at=datetime.utcnow()
         )
 
+    def _load_tuned_params(
+        self,
+        entity_type: str,
+        entity_id: str,
+        metric: str,
+        config_id: int = 0,
+    ) -> dict:
+        """
+        Carrega parâmetros Prophet tunados do filesystem.
+
+        Returns:
+            Dict com params tunados ou {} se não existir
+        """
+        import json
+        params_dir = _get_prophet_params_dir()
+        # Busca em todos os configs se config_id=0
+        if config_id > 0:
+            params_path = params_dir / f"config_{config_id}" / f"{entity_type}_{entity_id}_{metric}.json"
+            if params_path.exists():
+                try:
+                    with open(params_path) as f:
+                        data = json.load(f)
+                    return data.get("best_params", {})
+                except Exception:
+                    return {}
+        return {}
+
     def _forecast_prophet(
         self,
         df: pd.DataFrame,
@@ -177,6 +230,7 @@ class TimeSeriesForecaster:
         entity_type: str,
         entity_id: str,
         horizon_days: int,
+        config_id: int = 0,
     ) -> list[ForecastResult]:
         """Previsão usando Prophet."""
         # Preparar dados no formato Prophet
@@ -186,6 +240,11 @@ class TimeSeriesForecaster:
         data_days = (df['date'].max() - df['date'].min()).days
         use_yearly = data_days >= 365  # Only use if we have a year of data
 
+        # Carregar params tunados (se existirem)
+        tuned = self._load_tuned_params(entity_type, entity_id, metric, config_id)
+        changepoint_prior = tuned.get('changepoint_prior_scale', 0.05)
+        seasonality_prior = tuned.get('seasonality_prior_scale', 10.0)
+
         # Configurar modelo
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -193,7 +252,8 @@ class TimeSeriesForecaster:
                 yearly_seasonality=use_yearly,  # Enable if sufficient data
                 weekly_seasonality=True,
                 daily_seasonality=False,
-                changepoint_prior_scale=0.05,
+                changepoint_prior_scale=changepoint_prior,
+                seasonality_prior_scale=seasonality_prior,
                 interval_width=self.confidence_level,
             )
 

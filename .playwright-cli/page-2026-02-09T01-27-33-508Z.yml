@@ -1,0 +1,393 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - img [ref=e6]
+        - generic [ref=e8]: Marketing
+      - navigation [ref=e9]:
+        - link "Facebook Ads" [ref=e10] [cursor=pointer]:
+          - /url: /app/facebook-ads
+          - img [ref=e11]
+          - text: Facebook Ads
+        - link "ML Analytics" [ref=e13] [cursor=pointer]:
+          - /url: /app/ml
+          - img [ref=e14]
+          - text: ML Analytics
+        - link "Agente IA" [ref=e24] [cursor=pointer]:
+          - /url: /app/ai-agent
+          - img [ref=e25]
+          - text: Agente IA
+      - generic [ref=e29]:
+        - generic [ref=e31]: AD
+        - generic [ref=e32]:
+          - paragraph [ref=e33]: Administrador
+          - paragraph [ref=e34]: Gestor
+    - generic [ref=e35]:
+      - banner [ref=e36]:
+        - heading "Facebook Ads" [level=1] [ref=e37]
+      - main [ref=e38]:
+        - generic [ref=e42]:
+          - generic [ref=e43]:
+            - generic [ref=e44]:
+              - heading "Facebook Ads" [level=1] [ref=e45]
+              - paragraph [ref=e46]: Famachat
+            - generic [ref=e47]:
+              - combobox [ref=e48]:
+                - img
+                - generic: Ultimos 30 dias
+                - img
+              - button "Abrir configuracoes" [ref=e49]:
+                - img
+          - generic [ref=e50]:
+            - img [ref=e52]
+            - generic [ref=e55]:
+              - img [ref=e56]
+              - generic [ref=e59]: "Ultima atualizacao: em cerca de 6 horas"
+            - generic [ref=e60]: "|"
+            - generic [ref=e61]: "Proxima: em cerca de 7 horas"
+            - button "Atualizar Agora" [ref=e62]:
+              - img
+              - text: Atualizar Agora
+          - generic [ref=e63]:
+            - generic [ref=e65]:
+              - generic [ref=e66]:
+                - generic [ref=e67]:
+                  - generic [ref=e68]: Gasto Total
+                  - button [ref=e69]:
+                    - img [ref=e70]
+                - img [ref=e74]
+              - generic [ref=e76]: R$ 3.271,45
+              - generic [ref=e77]:
+                - img [ref=e78]
+                - generic [ref=e81]: "-20.2%"
+                - generic [ref=e82]: vs. periodo anterior
+            - generic [ref=e84]:
+              - generic [ref=e85]:
+                - generic [ref=e86]:
+                  - generic [ref=e87]: Leads
+                  - button [ref=e88]:
+                    - img [ref=e89]
+                - img [ref=e93]
+              - generic [ref=e97]: "245"
+              - generic [ref=e98]:
+                - img [ref=e99]
+                - generic [ref=e102]: "-21.2%"
+                - generic [ref=e103]: vs. periodo anterior
+            - generic [ref=e105]:
+              - generic [ref=e106]:
+                - generic [ref=e107]:
+                  - generic [ref=e108]: CPL
+                  - button [ref=e109]:
+                    - img [ref=e110]
+                - img [ref=e114]
+              - generic [ref=e119]: R$ 13,35
+              - generic [ref=e120]:
+                - img [ref=e121]
+                - generic [ref=e124]: +1.3%
+                - generic [ref=e125]: vs. periodo anterior
+            - generic [ref=e127]:
+              - generic [ref=e128]:
+                - generic [ref=e129]:
+                  - generic [ref=e130]: CPM
+                  - button [ref=e131]:
+                    - img [ref=e132]
+                - img [ref=e136]
+              - generic [ref=e139]: R$ 13,89
+              - generic [ref=e140]:
+                - img [ref=e141]
+                - generic [ref=e144]: +9.0%
+                - generic [ref=e145]: vs. periodo anterior
+            - generic [ref=e147]:
+              - generic [ref=e148]:
+                - generic [ref=e149]:
+                  - generic [ref=e150]: CPC
+                  - button [ref=e151]:
+                    - img [ref=e152]
+                - img [ref=e156]
+              - generic [ref=e162]: R$ 1,16
+              - generic [ref=e163]:
+                - img [ref=e164]
+                - generic [ref=e167]: "-1.4%"
+                - generic [ref=e168]: vs. periodo anterior
+          - generic [ref=e169]:
+            - tablist [ref=e170]:
+              - tab "Campanhas 18" [selected] [ref=e171]:
+                - img
+                - generic [ref=e172]: Campanhas
+                - generic [ref=e173]: "18"
+              - tab "Conjuntos 50" [ref=e174]:
+                - img
+                - generic [ref=e175]: Conjuntos
+                - generic [ref=e176]: "50"
+              - tab "Anuncios 50" [ref=e177]:
+                - img
+                - generic [ref=e178]: Anuncios
+                - generic [ref=e179]: "50"
+            - tabpanel "Campanhas 18" [ref=e180]:
+              - generic [ref=e181]:
+                - heading "Campanhas" [level=2] [ref=e182]
+                - paragraph [ref=e183]: Visualize o desempenho das suas campanhas de marketing
+              - generic [ref=e184]:
+                - generic [ref=e185]:
+                  - generic [ref=e186]:
+                    - img [ref=e187]
+                    - textbox "Buscar campanha..." [ref=e190]
+                  - combobox [ref=e191]:
+                    - generic: Todos os status
+                    - img
+                - table [ref=e194]:
+                  - rowgroup [ref=e195]:
+                    - row "Nome Status Gasto Leads CPM CPC CPL CTR" [ref=e196]:
+                      - columnheader "Nome" [ref=e197] [cursor=pointer]:
+                        - generic [ref=e198]:
+                          - text: Nome
+                          - img [ref=e199]
+                      - columnheader "Status" [ref=e202] [cursor=pointer]:
+                        - generic [ref=e203]:
+                          - text: Status
+                          - img [ref=e204]
+                      - columnheader "Gasto" [ref=e207] [cursor=pointer]:
+                        - generic [ref=e208]:
+                          - text: Gasto
+                          - img [ref=e209]
+                      - columnheader "Leads" [ref=e211] [cursor=pointer]:
+                        - generic [ref=e212]:
+                          - text: Leads
+                          - img [ref=e213]
+                      - columnheader "CPM" [ref=e216] [cursor=pointer]:
+                        - generic [ref=e217]:
+                          - text: CPM
+                          - img [ref=e218]
+                      - columnheader "CPC" [ref=e221] [cursor=pointer]:
+                        - generic [ref=e222]:
+                          - text: CPC
+                          - img [ref=e223]
+                      - columnheader "CPL" [ref=e226] [cursor=pointer]:
+                        - generic [ref=e227]:
+                          - text: CPL
+                          - img [ref=e228]
+                      - columnheader "CTR" [ref=e231] [cursor=pointer]:
+                        - generic [ref=e232]:
+                          - text: CTR
+                          - img [ref=e233]
+                      - columnheader [ref=e236]
+                  - rowgroup [ref=e237]:
+                    - row "(JULHO)(CADASTRO)(RUMMO) - BRIS Ativa R$ 554,30 44 R$ 14,23 R$ 1,18 R$ 12,60 1.20%" [ref=e238] [cursor=pointer]:
+                      - cell "(JULHO)(CADASTRO)(RUMMO) - BRIS" [ref=e239]
+                      - cell "Ativa" [ref=e240]:
+                        - generic [ref=e241]: Ativa
+                      - cell "R$ 554,30" [ref=e242]
+                      - cell "44" [ref=e243]
+                      - cell "R$ 14,23" [ref=e244]
+                      - cell "R$ 1,18" [ref=e245]
+                      - cell "R$ 12,60" [ref=e246]
+                      - cell "1.20%" [ref=e247]
+                      - cell [ref=e248]:
+                        - img [ref=e249]
+                    - row "(SETEMBRO)(CADASTRO)(HLTS) - VISTA Ativa R$ 511,37 49 R$ 8,60 R$ 1,16 R$ 10,44 0.74%" [ref=e251] [cursor=pointer]:
+                      - cell "(SETEMBRO)(CADASTRO)(HLTS) - VISTA" [ref=e252]
+                      - cell "Ativa" [ref=e253]:
+                        - generic [ref=e254]: Ativa
+                      - cell "R$ 511,37" [ref=e255]
+                      - cell "49" [ref=e256]
+                      - cell "R$ 8,60" [ref=e257]
+                      - cell "R$ 1,16" [ref=e258]
+                      - cell "R$ 10,44" [ref=e259]
+                      - cell "0.74%" [ref=e260]
+                      - cell [ref=e261]:
+                        - img [ref=e262]
+                    - row "(SETEMBRO)(CADASTRO)(LIBRI) - ELISIOS Ativa R$ 485,95 37 R$ 14,28 R$ 0,97 R$ 13,13 1.47%" [ref=e264] [cursor=pointer]:
+                      - cell "(SETEMBRO)(CADASTRO)(LIBRI) - ELISIOS" [ref=e265]
+                      - cell "Ativa" [ref=e266]:
+                        - generic [ref=e267]: Ativa
+                      - cell "R$ 485,95" [ref=e268]
+                      - cell "37" [ref=e269]
+                      - cell "R$ 14,28" [ref=e270]
+                      - cell "R$ 0,97" [ref=e271]
+                      - cell "R$ 13,13" [ref=e272]
+                      - cell "1.47%" [ref=e273]
+                      - cell [ref=e274]:
+                        - img [ref=e275]
+                    - row "(SETEMBRO)(CADASTRO)(HLTS) - ARBI Ativa R$ 435,14 23 R$ 13,83 R$ 1,50 R$ 18,92 0.92%" [ref=e277] [cursor=pointer]:
+                      - cell "(SETEMBRO)(CADASTRO)(HLTS) - ARBI" [ref=e278]
+                      - cell "Ativa" [ref=e279]:
+                        - generic [ref=e280]: Ativa
+                      - cell "R$ 435,14" [ref=e281]
+                      - cell "23" [ref=e282]
+                      - cell "R$ 13,83" [ref=e283]
+                      - cell "R$ 1,50" [ref=e284]
+                      - cell "R$ 18,92" [ref=e285]
+                      - cell "0.92%" [ref=e286]
+                      - cell [ref=e287]:
+                        - img [ref=e288]
+                    - row "(NOVEMBRO)(CADASTRO)(HLTS) - VEREDA Ativa R$ 369,68 24 R$ 14,71 R$ 1,06 R$ 15,40 1.39%" [ref=e290] [cursor=pointer]:
+                      - cell "(NOVEMBRO)(CADASTRO)(HLTS) - VEREDA" [ref=e291]
+                      - cell "Ativa" [ref=e292]:
+                        - generic [ref=e293]: Ativa
+                      - cell "R$ 369,68" [ref=e294]
+                      - cell "24" [ref=e295]
+                      - cell "R$ 14,71" [ref=e296]
+                      - cell "R$ 1,06" [ref=e297]
+                      - cell "R$ 15,40" [ref=e298]
+                      - cell "1.39%" [ref=e299]
+                      - cell [ref=e300]:
+                        - img [ref=e301]
+                    - row "(SETEMBRO)(CADASTRO)(URBANI) - BELLA VITA Ativa R$ 287,14 17 R$ 16,43 R$ 1,71 R$ 16,89 0.96%" [ref=e303] [cursor=pointer]:
+                      - cell "(SETEMBRO)(CADASTRO)(URBANI) - BELLA VITA" [ref=e304]
+                      - cell "Ativa" [ref=e305]:
+                        - generic [ref=e306]: Ativa
+                      - cell "R$ 287,14" [ref=e307]
+                      - cell "17" [ref=e308]
+                      - cell "R$ 16,43" [ref=e309]
+                      - cell "R$ 1,71" [ref=e310]
+                      - cell "R$ 16,89" [ref=e311]
+                      - cell "0.96%" [ref=e312]
+                      - cell [ref=e313]:
+                        - img [ref=e314]
+                    - row "(NOVEMBRO)(CADASTRO)(PACAEMBU) - CASAS PACAEMBU Ativa R$ 280,39 22 R$ 17,02 R$ 0,83 R$ 12,75 2.04%" [ref=e316] [cursor=pointer]:
+                      - cell "(NOVEMBRO)(CADASTRO)(PACAEMBU) - CASAS PACAEMBU" [ref=e317]
+                      - cell "Ativa" [ref=e318]:
+                        - generic [ref=e319]: Ativa
+                      - cell "R$ 280,39" [ref=e320]
+                      - cell "22" [ref=e321]
+                      - cell "R$ 17,02" [ref=e322]
+                      - cell "R$ 0,83" [ref=e323]
+                      - cell "R$ 12,75" [ref=e324]
+                      - cell "2.04%" [ref=e325]
+                      - cell [ref=e326]:
+                        - img [ref=e327]
+                    - row "(NOVEMBRO)(CADASTRO)(RENAULT) - ZURIQUE Ativa R$ 257,15 23 R$ 23,84 R$ 1,20 R$ 11,18 1.99%" [ref=e329] [cursor=pointer]:
+                      - cell "(NOVEMBRO)(CADASTRO)(RENAULT) - ZURIQUE" [ref=e330]
+                      - cell "Ativa" [ref=e331]:
+                        - generic [ref=e332]: Ativa
+                      - cell "R$ 257,15" [ref=e333]
+                      - cell "23" [ref=e334]
+                      - cell "R$ 23,84" [ref=e335]
+                      - cell "R$ 1,20" [ref=e336]
+                      - cell "R$ 11,18" [ref=e337]
+                      - cell "1.99%" [ref=e338]
+                      - cell [ref=e339]:
+                        - img [ref=e340]
+                    - row "(JULHO)(CADASTRO)(OPCAO) - GARDEN SUL Ativa R$ 178,36 16 R$ 18,59 R$ 1,25 R$ 11,15 1.49%" [ref=e342] [cursor=pointer]:
+                      - cell "(JULHO)(CADASTRO)(OPCAO) - GARDEN SUL" [ref=e343]
+                      - cell "Ativa" [ref=e344]:
+                        - generic [ref=e345]: Ativa
+                      - cell "R$ 178,36" [ref=e346]
+                      - cell "16" [ref=e347]
+                      - cell "R$ 18,59" [ref=e348]
+                      - cell "R$ 1,25" [ref=e349]
+                      - cell "R$ 11,15" [ref=e350]
+                      - cell "1.49%" [ref=e351]
+                      - cell [ref=e352]:
+                        - img [ref=e353]
+                    - row "(JULHO)(CADASTRO)(OPCAO) - RECANTO VERDE II Pausada R$ 0,00 0 R$ 0,00 R$ 0,00 — 0.00%" [ref=e355] [cursor=pointer]:
+                      - cell "(JULHO)(CADASTRO)(OPCAO) - RECANTO VERDE II" [ref=e356]
+                      - cell "Pausada" [ref=e357]:
+                        - generic [ref=e358]: Pausada
+                      - cell "R$ 0,00" [ref=e359]
+                      - cell "0" [ref=e360]
+                      - cell "R$ 0,00" [ref=e361]
+                      - cell "R$ 0,00" [ref=e362]
+                      - cell "—" [ref=e363]
+                      - cell "0.00%" [ref=e364]
+                      - cell [ref=e365]:
+                        - img [ref=e366]
+                    - row "(JULHO)(CADASTRO)(RENAOUT DINIZ) - TOKIO Pausada R$ 0,00 0 R$ 0,00 R$ 0,00 — 0.00%" [ref=e368] [cursor=pointer]:
+                      - cell "(JULHO)(CADASTRO)(RENAOUT DINIZ) - TOKIO" [ref=e369]
+                      - cell "Pausada" [ref=e370]:
+                        - generic [ref=e371]: Pausada
+                      - cell "R$ 0,00" [ref=e372]
+                      - cell "0" [ref=e373]
+                      - cell "R$ 0,00" [ref=e374]
+                      - cell "R$ 0,00" [ref=e375]
+                      - cell "—" [ref=e376]
+                      - cell "0.00%" [ref=e377]
+                      - cell [ref=e378]:
+                        - img [ref=e379]
+                    - row "(JULHO)(CADASTRO)(VITTA) - JARDIM SUL Pausada R$ 0,00 0 R$ 0,00 R$ 0,00 — 0.00%" [ref=e381] [cursor=pointer]:
+                      - cell "(JULHO)(CADASTRO)(VITTA) - JARDIM SUL" [ref=e382]
+                      - cell "Pausada" [ref=e383]:
+                        - generic [ref=e384]: Pausada
+                      - cell "R$ 0,00" [ref=e385]
+                      - cell "0" [ref=e386]
+                      - cell "R$ 0,00" [ref=e387]
+                      - cell "R$ 0,00" [ref=e388]
+                      - cell "—" [ref=e389]
+                      - cell "0.00%" [ref=e390]
+                      - cell [ref=e391]:
+                        - img [ref=e392]
+                    - row "(JULHO)(CADASTRO)(DEBS) - NOVO HOLANDA Pausada R$ 0,00 0 R$ 0,00 R$ 0,00 — 0.00%" [ref=e394] [cursor=pointer]:
+                      - cell "(JULHO)(CADASTRO)(DEBS) - NOVO HOLANDA" [ref=e395]
+                      - cell "Pausada" [ref=e396]:
+                        - generic [ref=e397]: Pausada
+                      - cell "R$ 0,00" [ref=e398]
+                      - cell "0" [ref=e399]
+                      - cell "R$ 0,00" [ref=e400]
+                      - cell "R$ 0,00" [ref=e401]
+                      - cell "—" [ref=e402]
+                      - cell "0.00%" [ref=e403]
+                      - cell [ref=e404]:
+                        - img [ref=e405]
+                    - row "(JULHO)(CADASTRO)(VITTA) - MATIZ Pausada R$ 0,00 0 R$ 0,00 R$ 0,00 — 0.00%" [ref=e407] [cursor=pointer]:
+                      - cell "(JULHO)(CADASTRO)(VITTA) - MATIZ" [ref=e408]
+                      - cell "Pausada" [ref=e409]:
+                        - generic [ref=e410]: Pausada
+                      - cell "R$ 0,00" [ref=e411]
+                      - cell "0" [ref=e412]
+                      - cell "R$ 0,00" [ref=e413]
+                      - cell "R$ 0,00" [ref=e414]
+                      - cell "—" [ref=e415]
+                      - cell "0.00%" [ref=e416]
+                      - cell [ref=e417]:
+                        - img [ref=e418]
+                    - row "(JULHO)(CADASTRO)(OPCAO) - SELECT Pausada R$ 0,00 0 R$ 0,00 R$ 0,00 — 0.00%" [ref=e420] [cursor=pointer]:
+                      - cell "(JULHO)(CADASTRO)(OPCAO) - SELECT" [ref=e421]
+                      - cell "Pausada" [ref=e422]:
+                        - generic [ref=e423]: Pausada
+                      - cell "R$ 0,00" [ref=e424]
+                      - cell "0" [ref=e425]
+                      - cell "R$ 0,00" [ref=e426]
+                      - cell "R$ 0,00" [ref=e427]
+                      - cell "—" [ref=e428]
+                      - cell "0.00%" [ref=e429]
+                      - cell [ref=e430]:
+                        - img [ref=e431]
+                    - row "(AGOSTO)(CADASTRO)(CANDIDATOS) - CORRETOR Arquivada R$ 0,00 0 R$ 0,00 R$ 0,00 — 0.00%" [ref=e433] [cursor=pointer]:
+                      - cell "(AGOSTO)(CADASTRO)(CANDIDATOS) - CORRETOR" [ref=e434]
+                      - cell "Arquivada" [ref=e435]:
+                        - generic [ref=e436]: Arquivada
+                      - cell "R$ 0,00" [ref=e437]
+                      - cell "0" [ref=e438]
+                      - cell "R$ 0,00" [ref=e439]
+                      - cell "R$ 0,00" [ref=e440]
+                      - cell "—" [ref=e441]
+                      - cell "0.00%" [ref=e442]
+                      - cell [ref=e443]:
+                        - img [ref=e444]
+                    - row "(SETEMBRO)(CADASTRO)(HLTS) - OASIS Pausada R$ 0,00 0 R$ 0,00 R$ 0,00 — 0.00%" [ref=e446] [cursor=pointer]:
+                      - cell "(SETEMBRO)(CADASTRO)(HLTS) - OASIS" [ref=e447]
+                      - cell "Pausada" [ref=e448]:
+                        - generic [ref=e449]: Pausada
+                      - cell "R$ 0,00" [ref=e450]
+                      - cell "0" [ref=e451]
+                      - cell "R$ 0,00" [ref=e452]
+                      - cell "R$ 0,00" [ref=e453]
+                      - cell "—" [ref=e454]
+                      - cell "0.00%" [ref=e455]
+                      - cell [ref=e456]:
+                        - img [ref=e457]
+                    - row "FEIRÃO MCMV Arquivada R$ 0,00 0 R$ 0,00 R$ 0,00 — 0.00%" [ref=e459] [cursor=pointer]:
+                      - cell "FEIRÃO MCMV" [ref=e460]
+                      - cell "Arquivada" [ref=e461]:
+                        - generic [ref=e462]: Arquivada
+                      - cell "R$ 0,00" [ref=e463]
+                      - cell "0" [ref=e464]
+                      - cell "R$ 0,00" [ref=e465]
+                      - cell "R$ 0,00" [ref=e466]
+                      - cell "—" [ref=e467]
+                      - cell "0.00%" [ref=e468]
+                      - cell [ref=e469]:
+                        - img [ref=e470]
+                - generic [ref=e472]: 18 campanha(s)
+  - region "Notifications alt+T"
+  - alert [ref=e41]

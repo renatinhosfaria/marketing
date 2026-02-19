@@ -1,0 +1,30 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - img [ref=e6]
+        - generic [ref=e8]: Marketing
+      - navigation [ref=e9]:
+        - link "Facebook Ads" [ref=e10] [cursor=pointer]:
+          - /url: /app/facebook-ads
+          - img [ref=e11]
+          - text: Facebook Ads
+        - link "ML Analytics" [ref=e13] [cursor=pointer]:
+          - /url: /app/ml
+          - img [ref=e14]
+          - text: ML Analytics
+        - link "Agente IA" [ref=e24] [cursor=pointer]:
+          - /url: /app/ai-agent
+          - img [ref=e25]
+          - text: Agente IA
+      - generic [ref=e29]:
+        - generic [ref=e31]: AD
+        - generic [ref=e32]:
+          - paragraph [ref=e33]: Administrador
+          - paragraph [ref=e34]: Gestor
+    - generic [ref=e35]:
+      - banner [ref=e36]:
+        - heading "Facebook Ads" [level=1] [ref=e37]
+      - main [ref=e38]
+  - region "Notifications alt+T"
+  - alert [ref=e41]

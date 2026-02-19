@@ -116,20 +116,26 @@ export function getDateRangeFromPreset(preset: DatePreset): {
 
     case "last_7d":
       start = new Date(now);
-      start.setDate(start.getDate() - 6);
+      start.setDate(start.getDate() - 7);
       start.setHours(0, 0, 0, 0);
+      end.setDate(end.getDate() - 1);
+      end.setHours(23, 59, 59, 999);
       break;
 
     case "last_14d":
       start = new Date(now);
-      start.setDate(start.getDate() - 13);
+      start.setDate(start.getDate() - 14);
       start.setHours(0, 0, 0, 0);
+      end.setDate(end.getDate() - 1);
+      end.setHours(23, 59, 59, 999);
       break;
 
     case "last_30d":
       start = new Date(now);
-      start.setDate(start.getDate() - 29);
+      start.setDate(start.getDate() - 30);
       start.setHours(0, 0, 0, 0);
+      end.setDate(end.getDate() - 1);
+      end.setHours(23, 59, 59, 999);
       break;
 
     case "this_month":

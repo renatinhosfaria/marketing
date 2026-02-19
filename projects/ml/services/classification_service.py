@@ -319,7 +319,7 @@ class ClassificationService:
     async def train_classifier(
         self,
         config_id: int,
-        min_samples: int = 30,
+        min_samples: int = settings.ml_min_samples_for_training,
         prefer_real_feedback: bool = True,
     ) -> Optional[dict]:
         """

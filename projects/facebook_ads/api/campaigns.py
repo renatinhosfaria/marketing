@@ -33,7 +33,7 @@ router = APIRouter()
 
 
 # Presets que devem incluir dados de hoje
-PRESETS_WITH_TODAY = {"today", "this_month", "this_year", "last_7d", "last_14d", "last_30d", "last_90d"}
+PRESETS_WITH_TODAY = {"today", "this_month", "this_year"}
 PRESETS_ONLY_TODAY = {"today"}
 
 
@@ -44,10 +44,11 @@ def _parse_date_params(date_preset: Optional[str]) -> tuple[datetime, datetime]:
     presets = {
         "today": (today, today),
         "yesterday": (today - timedelta(days=1), today - timedelta(days=1)),
-        "last_7d": (today - timedelta(days=7), today),
-        "last_14d": (today - timedelta(days=14), today),
-        "last_30d": (today - timedelta(days=30), today),
-        "last_90d": (today - timedelta(days=90), today),
+        # "last_*" usa dias completos anteriores (alinhado ao Ads Manager), excluindo hoje
+        "last_7d": (today - timedelta(days=7), today - timedelta(days=1)),
+        "last_14d": (today - timedelta(days=14), today - timedelta(days=1)),
+        "last_30d": (today - timedelta(days=30), today - timedelta(days=1)),
+        "last_90d": (today - timedelta(days=90), today - timedelta(days=1)),
         "this_month": (today.replace(day=1), today),
         "last_month": ((today.replace(day=1) - timedelta(days=1)).replace(day=1), today.replace(day=1) - timedelta(days=1)),
         "this_year": (today.replace(month=1, day=1), today),

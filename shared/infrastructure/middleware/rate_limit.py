@@ -24,6 +24,7 @@ class RateLimitConfig:
     """Configuration for rate limiting."""
     requests_per_minute: int = 60
     requests_per_hour: int = 1000
+    requests_per_day: int = 10000
     burst_limit: int = 10  # Max burst requests
     enabled: bool = True
     whitelist_paths: list[str] = None  # Paths to skip rate limiting
@@ -121,6 +122,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # Hourly tracking
         self._hourly_counts: dict[str, int] = defaultdict(int)
         self._hourly_reset: dict[str, float] = {}
+        # Daily tracking
+        self._daily_counts: dict[str, int] = defaultdict(int)
+        self._daily_reset: dict[str, float] = {}
 
         # Cleanup old buckets periodically
         self._last_cleanup = time.time()
@@ -130,6 +134,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             "Rate limiter initialized",
             requests_per_minute=self.config.requests_per_minute,
             requests_per_hour=self.config.requests_per_hour,
+            requests_per_day=self.config.requests_per_day,
             burst_limit=self.config.burst_limit,
             enabled=self.config.enabled
         )
@@ -174,6 +179,27 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self._hourly_counts[client_id] += 1
         return True, 0
 
+    def _check_daily_limit(self, client_id: str) -> tuple[bool, int]:
+        """
+        Check daily rate limit.
+
+        Returns:
+            Tuple of (allowed, retry_after_seconds)
+        """
+        now = time.time()
+
+        # Reset daily counter if needed
+        if client_id not in self._daily_reset or now - self._daily_reset[client_id] >= 86400:
+            self._daily_counts[client_id] = 0
+            self._daily_reset[client_id] = now
+
+        if self._daily_counts[client_id] >= self.config.requests_per_day:
+            retry_after = int(86400 - (now - self._daily_reset[client_id]))
+            return False, max(1, retry_after)
+
+        self._daily_counts[client_id] += 1
+        return True, 0
+
     def _cleanup_old_buckets(self):
         """Remove buckets for clients that haven't been seen recently."""
         now = time.time()
@@ -192,6 +218,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     del self._hourly_counts[client_id]
                 if client_id in self._hourly_reset:
                     del self._hourly_reset[client_id]
+                if client_id in self._daily_counts:
+                    del self._daily_counts[client_id]
+                if client_id in self._daily_reset:
+                    del self._daily_reset[client_id]
 
             self._last_cleanup = now
 
@@ -233,6 +263,25 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 headers={"Retry-After": str(hourly_retry)}
             )
 
+        # Check daily limit
+        daily_allowed, daily_retry = self._check_daily_limit(client_id)
+        if not daily_allowed:
+            logger.warning(
+                "Daily rate limit exceeded",
+                client_id=client_id,
+                path=request.url.path
+            )
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "detail": "Rate limit exceeded",
+                    "error": "too_many_requests",
+                    "retry_after": daily_retry,
+                    "limit_type": "daily"
+                },
+                headers={"Retry-After": str(daily_retry)}
+            )
+
         # Check per-minute limit (token bucket)
         bucket = self._buckets[client_id]
         if not bucket.consume():
@@ -269,6 +318,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 "config": {
                     "requests_per_minute": self.config.requests_per_minute,
                     "requests_per_hour": self.config.requests_per_hour,
+                    "requests_per_day": self.config.requests_per_day,
                     "burst_limit": self.config.burst_limit,
                     "enabled": self.config.enabled,
                 },
@@ -276,6 +326,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     client_id: {
                         "tokens_available": int(bucket.tokens),
                         "hourly_count": self._hourly_counts.get(client_id, 0),
+                        "daily_count": self._daily_counts.get(client_id, 0),
                     }
                     for client_id, bucket in list(self._buckets.items())[:10]  # Limit to first 10
                 }

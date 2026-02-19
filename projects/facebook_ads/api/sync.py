@@ -202,7 +202,7 @@ async def sync_today(
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: AsyncSession = Depends(get_db),
 ):
-    """Sincroniza apenas insights de hoje."""
+    """Sincroniza insights de hoje e reprocessa dias recentes."""
     service = SyncService(db)
 
     try:
@@ -212,7 +212,7 @@ async def sync_today(
         return SyncStartResponse(
             sync_id=sync_history.id,
             status="pending",
-            message="Sincronização de hoje iniciada",
+            message="Sincronização de hoje e dias recentes iniciada",
         ).model_dump(by_alias=True)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))

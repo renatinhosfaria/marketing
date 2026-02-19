@@ -10,6 +10,7 @@ import re
 import time
 
 from fastapi import APIRouter, Request, Depends, HTTPException
+from psycopg import OperationalError
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.types import Command
@@ -24,7 +25,12 @@ from projects.agent.api.dependencies import (
     get_store,
     get_checkpointer,
 )
-from projects.agent.api.schemas import ChatRequest, ConversationPreview, ConversationMessages
+from projects.agent.api.schemas import (
+    ACCOUNT_ID_PATTERN,
+    ChatRequest,
+    ConversationPreview,
+    ConversationMessages,
+)
 from projects.agent.memory.namespaces import StoreNamespace
 from projects.agent.api.stream import sse_event, _safe_json
 from projects.agent.config import agent_settings
@@ -43,6 +49,7 @@ router = APIRouter()
 # Controle de streams concorrentes por usuario via Semaphore
 _stream_semaphores: dict[str, asyncio.Semaphore] = {}
 MAX_STREAMS_PER_USER = 3
+_ACCOUNT_ID_RE = re.compile(ACCOUNT_ID_PATTERN)
 
 
 def _get_semaphore(user_id: str) -> asyncio.Semaphore:
@@ -53,6 +60,16 @@ def _get_semaphore(user_id: str) -> asyncio.Semaphore:
     if user_id not in _stream_semaphores:
         _stream_semaphores[user_id] = asyncio.Semaphore(MAX_STREAMS_PER_USER)
     return _stream_semaphores[user_id]
+
+
+def _validate_account_id(account_id: str) -> str:
+    """Valida account_id aceitando act_<digitos> ou <digitos>."""
+    if not _ACCOUNT_ID_RE.fullmatch(account_id):
+        raise HTTPException(
+            status_code=400,
+            detail="account_id invalido. Use act_<digitos> ou <digitos>",
+        )
+    return account_id
 
 
 def _build_thread_id(thread_id: str, user_id: str, account_id: str) -> str:
@@ -82,6 +99,19 @@ def _build_thread_id(thread_id: str, user_id: str, account_id: str) -> str:
     return f"{prefix}{thread_id}"
 
 
+def _resolve_stream_status(task: asyncio.Task) -> str:
+    """Classifica status final da task de stream sem propagar CancelledError."""
+    if not task.done():
+        return "ok"
+    if task.cancelled():
+        return "cancelled"
+    try:
+        exc = task.exception()
+    except asyncio.CancelledError:
+        return "cancelled"
+    return "error" if exc else "ok"
+
+
 @router.post("/chat")
 async def chat_stream(
     request: Request,
@@ -95,19 +125,30 @@ async def chat_stream(
     - Envio de mensagem nova (body.message)
     - Retomada apos interrupt (body.resume_payload)
     """
+    account_id = _validate_account_id(body.account_id)
+
+    logger.info(
+        "chat.request_received",
+        user_id=str(user.user_id),
+        account_id=account_id,
+        thread_id=body.thread_id,
+        has_message=bool(body.message),
+        is_resume=bool(body.resume_payload),
+    )
+
     semaphore = _get_semaphore(str(user.user_id))
     if semaphore.locked():
         raise HTTPException(429, "Limite de streams concorrentes atingido.")
 
     # thread_id prefixado para isolamento multi-tenant
     safe_thread_id = _build_thread_id(
-        body.thread_id, str(user.user_id), body.account_id,
+        body.thread_id, str(user.user_id), account_id,
     )
     config = {
         "configurable": {
             "thread_id": safe_thread_id,
             "user_id": str(user.user_id),
-            "account_id": body.account_id,
+            "account_id": account_id,
         }
     }
 
@@ -121,7 +162,7 @@ async def chat_stream(
             "messages": [HumanMessage(content=body.message)],
             "user_context": {
                 "user_id": str(user.user_id),
-                "account_id": body.account_id,
+                "account_id": account_id,
                 "account_name": "",
                 "timezone": "America/Sao_Paulo",
             },
@@ -131,6 +172,7 @@ async def chat_stream(
         async with semaphore:
             agent_active_streams.inc()
             stream_start = time.monotonic()
+            stream_status = "ok"
             keepalive_interval = agent_settings.sse_keepalive_interval
             queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=100)
 
@@ -248,6 +290,7 @@ async def chat_stream(
                 while True:
                     # Verifica disconnect do cliente
                     if await request.is_disconnected():
+                        stream_status = "cancelled"
                         graph_task.cancel()
                         break
 
@@ -266,15 +309,24 @@ async def chat_stream(
             finally:
                 agent_active_streams.dec()
                 elapsed = time.monotonic() - stream_start
-                agent_response_duration.labels(routing_urgency="default").observe(elapsed)
-                status = "error" if graph_task.done() and graph_task.exception() else "ok"
-                agent_requests_total.labels(endpoint="/chat", status=status).inc()
                 if not graph_task.done():
                     graph_task.cancel()
                     try:
                         await graph_task
                     except asyncio.CancelledError:
-                        pass
+                        stream_status = "cancelled"
+
+                if stream_status == "ok":
+                    stream_status = _resolve_stream_status(graph_task)
+
+                agent_response_duration.labels(routing_urgency="default").observe(elapsed)
+                agent_requests_total.labels(endpoint="/chat", status=stream_status).inc()
+                logger.info(
+                    "chat.stream_completed",
+                    thread_id=safe_thread_id,
+                    duration_s=round(elapsed, 2),
+                    status=stream_status,
+                )
 
     return StreamingResponse(
         event_generator(),
@@ -294,6 +346,7 @@ async def list_conversations(
     store: AsyncPostgresStore = Depends(get_store),
 ):
     """Lista conversas do usuario para uma conta."""
+    account_id = _validate_account_id(account_id)
     prefix = f"{user.user_id}:{account_id}:"
 
     # Query the checkpoints table directly via the pool
@@ -321,7 +374,12 @@ async def list_conversations(
     titles: dict[str, str] = {}
     try:
         ns = StoreNamespace.conversation_titles(str(user.user_id), account_id)
-        title_items = await store.asearch(ns)
+        try:
+            title_items = await store.asearch(ns)
+        except OperationalError:
+            # Conexao morta — pool descarta e segunda tentativa pega conexao nova
+            logger.warning("store.retry_after_connection_error", operation="asearch")
+            title_items = await store.asearch(ns)
         if title_items:
             for item in title_items:
                 titles[item.key] = item.value.get("title", "Nova conversa")
@@ -350,6 +408,7 @@ async def get_conversation_messages(
     checkpointer: AsyncPostgresSaver = Depends(get_checkpointer),
 ):
     """Retorna mensagens de uma conversa."""
+    account_id = _validate_account_id(account_id)
     safe_thread_id = _build_thread_id(thread_id, str(user.user_id), account_id)
     config = {"configurable": {"thread_id": safe_thread_id}}
 
@@ -386,6 +445,7 @@ async def delete_conversation(
     store: AsyncPostgresStore = Depends(get_store),
 ):
     """Deleta uma conversa (checkpoints + titulo)."""
+    account_id = _validate_account_id(account_id)
     safe_thread_id = _build_thread_id(thread_id, str(user.user_id), account_id)
 
     async with checkpointer.conn.connection() as conn:
@@ -406,7 +466,11 @@ async def delete_conversation(
     # Delete title from store
     ns = StoreNamespace.conversation_titles(str(user.user_id), account_id)
     try:
-        await store.adelete(ns, thread_id)
+        try:
+            await store.adelete(ns, thread_id)
+        except OperationalError:
+            logger.warning("store.retry_after_connection_error", operation="adelete")
+            await store.adelete(ns, thread_id)
     except Exception as e:
         logger.warning("title.delete_failed", thread_id=thread_id, error=str(e))
 

@@ -6,6 +6,7 @@ import { parseSSE, sendAgentMessage, fetchConversationMessages } from "@/lib/age
 import type {
   InterruptPayload,
   Message,
+  ResumePayload,
   ToolResultData,
 } from "@/types/ai-agent";
 
@@ -215,6 +216,7 @@ export function useAgentChat(accountId: string) {
         );
       } finally {
         setIsStreaming(false);
+        reader.releaseLock();
       }
     },
     []
@@ -270,11 +272,17 @@ export function useAgentChat(accountId: string) {
       if (!interrupt) return;
 
       setIsStreaming(true);
-      const resumePayload = {
+      const parsedOverride = overrideValue ? Number.parseFloat(overrideValue) : NaN;
+      const hasOverride = Number.isFinite(parsedOverride);
+      const resumePayload: ResumePayload = {
         approval_token: interrupt.approval_token,
         approved,
-        override_value: overrideValue,
       };
+      if (hasOverride) {
+        resumePayload.new_budget_override = parsedOverride;
+        // Compatibilidade temporaria com payload legado.
+        resumePayload.override_value = parsedOverride;
+      }
       setInterrupt(null);
 
       // Adicionar mensagem do usuario indicando a decisao

@@ -47,7 +47,7 @@ class Settings(BaseSettings):
 
     # ML Configuration
     ml_default_horizon_days: int = 7
-    ml_min_samples_for_training: int = 30
+    ml_min_samples_for_training: int = 5
     ml_classification_tiers: list[str] = [
         "HIGH_PERFORMER",
         "MODERATE",

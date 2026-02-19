@@ -1,0 +1,295 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - img [ref=e7]
+          - generic [ref=e9]: Marketing
+        - button [ref=e10]:
+          - img [ref=e11]
+      - navigation [ref=e14]:
+        - link "Facebook Ads" [ref=e15] [cursor=pointer]:
+          - /url: /app/facebook-ads
+          - img [ref=e16]
+          - text: Facebook Ads
+        - link "ML Analytics" [ref=e18] [cursor=pointer]:
+          - /url: /app/ml
+          - img [ref=e19]
+          - text: ML Analytics
+        - link "Agente IA" [ref=e29] [cursor=pointer]:
+          - /url: /app/ai-agent
+          - img [ref=e30]
+          - text: Agente IA
+      - generic [ref=e34]:
+        - generic [ref=e36]: AD
+        - generic [ref=e37]:
+          - paragraph [ref=e38]: Administrador
+          - paragraph [ref=e39]: Gestor
+    - generic [ref=e40]:
+      - banner [ref=e41]:
+        - heading "Agente IA" [level=1] [ref=e42]
+      - main [ref=e43]:
+        - generic [ref=e45]:
+          - generic [ref=e51]:
+            - generic [ref=e52]:
+              - img [ref=e53]
+              - generic [ref=e56]:
+                - heading "Agente de Trafego Pago" [level=1] [ref=e57]
+                - paragraph [ref=e58]: Analises e recomendacoes em tempo real
+            - generic [ref=e59]:
+              - generic [ref=e62]: Online
+              - combobox [ref=e63]:
+                - option "Famachat (act_24036721645944375)" [selected]
+              - button "Debug" [ref=e64]:
+                - img
+                - generic [ref=e65]: Debug
+          - generic [ref=e66]:
+            - complementary [ref=e68]:
+              - generic [ref=e69]:
+                - heading "Conversas" [level=3] [ref=e70]
+                - button "Nova conversa" [ref=e71]:
+                  - img
+              - generic [ref=e73]:
+                - button "Qual campanha devo pausar? 2 mensagens 10/02" [active] [ref=e74]:
+                  - generic [ref=e75]: Qual campanha devo pausar?
+                  - generic [ref=e76]:
+                    - generic [ref=e77]: 2 mensagens
+                    - generic [ref=e78]: 10/02
+                - button "Excluir conversa" [ref=e79]:
+                  - img
+            - generic [ref=e81]:
+              - generic [ref=e82]:
+                - generic [ref=e83]:
+                  - img [ref=e84]
+                  - heading "Assistente de Tráfego Pago" [level=2] [ref=e87]
+                - generic [ref=e88]:
+                  - button "Nova conversa" [ref=e89]:
+                    - img
+                  - button "Limpar conversa" [ref=e90]:
+                    - img
+              - generic [ref=e94]:
+                - generic [ref=e111]:
+                  - img [ref=e113]
+                  - generic [ref=e117]: Qual campanha devo pausar?
+                - generic [ref=e118]:
+                  - img [ref=e120]
+                  - generic [ref=e124]:
+                    - heading "Resumo Executivo" [level=2] [ref=e125]
+                    - list [ref=e126]:
+                      - listitem [ref=e127]:
+                        - text: Há
+                        - strong [ref=e128]: 1 campanha crítica
+                        - text: para
+                        - strong [ref=e129]: pausar (ou cortar forte o budget imediatamente)
+                        - text: por estar com
+                        - strong [ref=e130]: CPL muito acima da média e piorando
+                        - text: .
+                      - listitem [ref=e131]:
+                        - text: Existem
+                        - strong [ref=e132]: várias campanhas classificadas como UNDERPERFORMER
+                        - text: (piores em CPL x volume) que são
+                        - strong [ref=e133]: candidatas diretas a pausa/corte
+                        - text: .
+                      - listitem [ref=e134]:
+                        - text: Há
+                        - strong [ref=e135]: 2 campanhas HIGH_PERFORMER
+                        - text: com CPL baixo que fazem sentido
+                        - strong [ref=e136]: manter e considerar escalar
+                        - text: .
+                    - separator [ref=e137]
+                    - heading "Alertas Críticos (agir agora)" [level=2] [ref=e138]
+                    - list [ref=e139]:
+                      - listitem [ref=e140]:
+                        - strong [ref=e141]:
+                          - text: "PAUSAR (ou reduzir -50% imediatamente):"
+                          - code [ref=e142]: "`120234212518590206`"
+                      - listitem [ref=e143]:
+                        - strong [ref=e144]: "CPL: R$ 28,58"
+                        - text: (
+                        - strong [ref=e145]: 240% da média
+                        - text: ) e
+                        - strong [ref=e146]: "tendência de alta: +100%"
+                      - listitem [ref=e147]: "Motivo: está consumindo verba com eficiência piorando."
+                      - listitem [ref=e148]: "Ação recomendada:"
+                      - listitem [ref=e149]:
+                        - strong [ref=e150]: "Opção agressiva:"
+                        - text: pausar agora e realocar verba para campanhas com CPL abaixo da média
+                      - listitem [ref=e151]:
+                        - strong [ref=e152]: "Opção conservadora:"
+                        - strong [ref=e153]: reduzir budget em -50%
+                        - text: enquanto revisa público/oferta/posicionamentos
+                      - listitem [ref=e154]:
+                        - text: "Impacto esperado: reduzir desperdício (estimativa"
+                        - strong [ref=e155]: ~R$ 42,86
+                        - text: no período analisado) e melhorar o CPL médio da conta.
+                    - separator [ref=e156]
+                    - heading "Análise de Performance (visão por classificação) Distribuição por tier (últimos 7 dias | config_id 14):" [level=2] [ref=e157]:
+                      - text: Análise de Performance (visão por classificação)
+                      - strong [ref=e158]: "Distribuição por tier (últimos 7 dias | config_id 14):"
+                    - list [ref=e159]:
+                      - listitem [ref=e160]:
+                        - strong [ref=e161]: "HIGH_PERFORMER:"
+                        - strong [ref=e162]: "8"
+                      - listitem [ref=e163]:
+                        - strong [ref=e164]: "MODERATE:"
+                        - strong [ref=e165]: "13"
+                      - listitem [ref=e166]:
+                        - strong [ref=e167]: "LOW:"
+                        - strong [ref=e168]: "13"
+                      - listitem [ref=e169]:
+                        - strong [ref=e170]: "UNDERPERFORMER:"
+                        - strong [ref=e171]: "16"
+                        - text: (onde estão as principais oportunidades de corte)
+                        - strong [ref=e172]: "UNDERPERFORMERS com pior relação custo/resultado (candidatos a pausa):"
+                        - text: "-"
+                        - code [ref=e173]: "`120229994165550206`"
+                        - text: —
+                        - strong [ref=e174]: CPL R$ 31,10
+                        - text: ","
+                        - strong [ref=e175]: 2 leads
+                        - text: ","
+                        - strong [ref=e176]: spend R$ 62,21
+                        - text: "-"
+                        - code [ref=e177]: "`120237855725490206`"
+                        - text: —
+                        - strong [ref=e178]: CPL R$ 23,05
+                        - text: ","
+                        - strong [ref=e179]: 2 leads
+                        - text: ","
+                        - strong [ref=e180]: spend R$ 46,09
+                        - text: "-"
+                        - code [ref=e181]: "`120234212518740206`"
+                        - text: —
+                        - strong [ref=e182]: CPL R$ 19,14
+                        - text: ","
+                        - strong [ref=e183]: 1 lead
+                        - text: ", spend"
+                        - strong [ref=e184]: R$ 19,14
+                        - text: "-"
+                        - code [ref=e185]: "`120237856444540206`"
+                        - text: —
+                        - strong [ref=e186]: CPL R$ 19,10
+                        - text: ","
+                        - strong [ref=e187]: 1 lead
+                        - text: ", spend"
+                        - strong [ref=e188]: R$ 19,10
+                        - text: "-"
+                        - code [ref=e189]: "`120234212879940206`"
+                        - text: —
+                        - strong [ref=e190]: CPL R$ 16,54
+                        - text: ","
+                        - strong [ref=e191]: 2 leads
+                        - text: ", spend"
+                        - strong [ref=e192]: R$ 33,08
+                        - text: "-"
+                        - code [ref=e193]: "`120234039490550206`"
+                        - text: —
+                        - strong [ref=e194]: CPL R$ 14,26
+                        - text: ","
+                        - strong [ref=e195]: 3 leads
+                        - text: ", spend"
+                        - strong [ref=e196]: R$ 42,78
+                        - text: "-"
+                        - code [ref=e197]: "`120237855725470206`"
+                        - text: —
+                        - strong [ref=e198]: CPL R$ 13,55
+                        - text: ","
+                        - strong [ref=e199]: 2 leads
+                        - text: ", spend"
+                        - strong [ref=e200]: R$ 27,10
+                        - text: "-"
+                        - code [ref=e201]: "`120230804266210206`"
+                        - text: —
+                        - strong [ref=e202]: CPL R$ 10,61
+                        - text: ","
+                        - strong [ref=e203]: 1 lead
+                        - text: ", spend"
+                        - strong [ref=e204]: R$ 10,61
+                        - strong [ref=e205]: "Destaques positivos (manter / possível escala):"
+                        - text: "-"
+                        - code [ref=e206]: "`120237856444520206`"
+                        - text: —
+                        - strong [ref=e207]: CPL R$ 6,36
+                        - text: ","
+                        - strong [ref=e208]: 4 leads
+                        - text: ", spend"
+                        - strong [ref=e209]: R$ 25,43
+                        - text: "-"
+                        - code [ref=e210]: "`120234212879950206`"
+                        - text: —
+                        - strong [ref=e211]: CPL R$ 6,71
+                        - text: ","
+                        - strong [ref=e212]: 6 leads
+                        - text: ", spend"
+                        - strong [ref=e213]: R$ 40,27
+                    - separator [ref=e214]
+                    - heading "Recomendações (passo a passo, acionável)" [level=2] [ref=e215]
+                    - list [ref=e216]:
+                      - listitem [ref=e217]:
+                        - strong [ref=e218]: "Imediato (controle de dano):"
+                    - list [ref=e219]:
+                      - listitem [ref=e220]:
+                        - strong [ref=e221]: Pausar ou cortar -50%
+                        - text: a campanha
+                        - strong [ref=e222]:
+                          - code [ref=e223]: "`120234212518590206`"
+                        - text: .
+                    - list [ref=e224]:
+                      - listitem [ref=e225]:
+                        - strong [ref=e226]: "Em seguida (otimização rápida de budget):"
+                    - list [ref=e227]:
+                      - listitem [ref=e228]:
+                        - strong [ref=e229]: Reduzir budget em -30%
+                        - text: da campanha
+                        - strong [ref=e230]:
+                          - code [ref=e231]: "`120233891992660206`"
+                      - listitem [ref=e232]:
+                        - strong [ref=e233]: CPL R$ 20,86
+                        - text: (
+                        - strong [ref=e234]: 163% da média
+                        - text: ) e
+                        - strong [ref=e235]: subindo +32,9%
+                    - list [ref=e236]:
+                      - listitem [ref=e237]:
+                        - strong [ref=e238]: "Limpeza de eficiência (próximas 24–48h):"
+                    - list [ref=e239]:
+                      - listitem [ref=e240]:
+                        - strong [ref=e241]: Pausar/cortar verba das UNDERPERFORMERS
+                        - text: ", priorizando as de"
+                        - strong [ref=e242]: CPL mais alto + baixo volume
+                        - text: ", especialmente:"
+                      - listitem [ref=e243]:
+                        - strong [ref=e244]:
+                          - code [ref=e245]: "`120229994165550206`"
+                        - text: e
+                        - strong [ref=e246]:
+                          - code [ref=e247]: "`120237855725490206`"
+                    - list [ref=e248]:
+                      - listitem [ref=e249]:
+                        - strong [ref=e250]: "Realocação de verba (onde colocar o dinheiro):"
+                    - list [ref=e251]:
+                      - listitem [ref=e252]:
+                        - text: Direcionar orçamento para as
+                        - strong [ref=e253]: HIGH_PERFORMERS
+                        - text: com
+                        - strong [ref=e254]: CPL ~R$ 6–7
+                        - text: (IDs acima), mantendo estabilidade e testando escala gradual.
+                    - separator [ref=e255]
+                    - heading "Para eu fechar a recomendação “pronta para execução”" [level=2] [ref=e256]
+                    - list [ref=e257]:
+                      - listitem [ref=e258]:
+                        - text: Me diga seu
+                        - strong [ref=e259]: CPL meta
+                        - text: "(ex.:"
+                        - strong [ref=e260]: R$ 8 / R$ 12
+                        - text: ) e, se possível, os
+                        - strong [ref=e261]: nomes
+                        - text: "dessas campanhas (ou um print do gerenciador). Aí eu te devolvo uma lista final do tipo:"
+                        - strong [ref=e262]: “Pause X, reduza Y, aumente Z”
+                        - text: já com os nomes amigáveis e a ordem exata de ação.
+              - generic [ref=e109]:
+                - textbox "Pergunte sobre suas campanhas..." [ref=e110]
+                - button "Enviar" [disabled]:
+                  - img
+  - region "Notifications alt+T"
+  - alert [ref=e50]

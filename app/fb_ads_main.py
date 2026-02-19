@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from shared.config import settings
 from shared.core.logging import setup_logging
 from shared.core.tracing.middleware import TraceMiddleware
+from shared.observability import setup_metrics, setup_tracing, instrument_fastapi, instrument_sqlalchemy
 from app.fb_ads_router import fb_ads_api_router
 from shared.db.session import engine, check_database_connection
 
@@ -68,6 +69,14 @@ app = FastAPI(
     openapi_url="/openapi.json" if settings.debug else None,
     lifespan=lifespan,
 )
+
+# Observabilidade: tracing + instrumentação (antes de adicionar middleware manual)
+setup_tracing(service_name="fb-ads-api", service_version=settings.app_version)
+instrument_fastapi(app)
+instrument_sqlalchemy(engine)
+
+# Métricas Prometheus (/metrics)
+setup_metrics(app, service_name="fb-ads-api")
 
 # Adicionar middleware de tracing
 app.add_middleware(TraceMiddleware)

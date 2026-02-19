@@ -13,12 +13,9 @@ def _table_names(statements):
 
 
 def test_build_hard_delete_statements_includes_tables_in_order():
-    statements = build_hard_delete_statements(123, ["thread-1", "thread-2"])
+    statements = build_hard_delete_statements(123)
 
     assert _table_names(statements) == [
-        "agent_checkpoints",
-        "agent_writes",
-        "agent_conversations",
         "ml_predictions",
         "ml_campaign_classifications",
         "ml_recommendations",
@@ -39,13 +36,9 @@ def test_build_hard_delete_statements_includes_tables_in_order():
     ]
 
 
-def test_build_hard_delete_statements_skips_thread_dependent_tables_when_empty():
-    statements = build_hard_delete_statements(123, [])
-    table_names = _table_names(statements)
-
-    assert "agent_checkpoints" not in table_names
-    assert "agent_writes" not in table_names
-    assert "agent_conversations" in table_names
+def test_build_hard_delete_statements_includes_config_table():
+    statements = build_hard_delete_statements(123)
+    assert "sistema_facebook_ads_config" in _table_names(statements)
 
 
 class _FakeResult:
@@ -63,16 +56,20 @@ class _FakeResult:
             return None
         return self._values[0]
 
+    def scalar(self):
+        if not self._values:
+            return None
+        return self._values[0]
+
 
 class _FakeSession:
-    def __init__(self, thread_ids):
-        self.thread_ids = thread_ids
+    def __init__(self):
         self.executed = []
 
     async def execute(self, stmt):
         self.executed.append(stmt)
-        if stmt.__class__.__name__ == "Select":
-            return _FakeResult(self.thread_ids)
+        if stmt.__class__.__name__ == "TextClause":
+            return _FakeResult(["table_exists"])
         return _FakeResult()
 
 
@@ -89,7 +86,9 @@ class _EndpointSession:
             self._select_calls += 1
             if self._select_calls == 1:
                 return _FakeResult([self.config])
-            return _FakeResult(["thread-1"])
+            return _FakeResult()
+        if stmt.__class__.__name__ == "TextClause":
+            return _FakeResult(["table_exists"])
         return _FakeResult()
 
     async def commit(self):
@@ -98,7 +97,7 @@ class _EndpointSession:
 
 @pytest.mark.asyncio
 async def test_hard_delete_config_executes_expected_deletes():
-    session = _FakeSession(["thread-1"])
+    session = _FakeSession()
 
     await hard_delete_config(session, 99)
 
@@ -107,9 +106,6 @@ async def test_hard_delete_config_executes_expected_deletes():
     ]
 
     assert delete_tables == [
-        "agent_checkpoints",
-        "agent_writes",
-        "agent_conversations",
         "ml_predictions",
         "ml_campaign_classifications",
         "ml_recommendations",
@@ -138,7 +134,6 @@ async def test_delete_config_hard_delete_executes_deletes():
         99,
         True,
         session,
-        current_user={"id": 1},
     )
 
     delete_tables = [

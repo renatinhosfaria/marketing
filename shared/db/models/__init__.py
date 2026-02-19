@@ -2,10 +2,9 @@
 Modelos de banco de dados compartilhados.
 
 - famachat_readonly: Tabelas do FamaChat Node.js (read-only)
-- ml_readonly: Tabelas ML (read-only, para uso pelo Agent)
+- ml_readonly: Tabelas ML (read-only para consultas auxiliares)
   IMPORTANTE: ml_readonly NÃO é importado aqui para evitar conflito
   de classes SQLAlchemy com projects/ml/db/models.py no processo ML API.
-  O Agent importa diretamente de shared.db.models.ml_readonly.
 """
 
 from shared.db.models.famachat_readonly import (

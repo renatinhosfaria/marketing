@@ -65,7 +65,7 @@ async def create_store_cm() -> AsyncIterator[AsyncPostgresStore]:
         min_size=1,
         max_size=3,
         check=AsyncConnectionPool.check_connection,
-        max_idle=300,
+        max_idle=60,
         kwargs={
             "autocommit": True,
             "prepare_threshold": 0,

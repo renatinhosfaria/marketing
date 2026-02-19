@@ -1,12 +1,66 @@
 """
-Funções específicas para logar eventos do agente.
+Funções de logging para tracing e observabilidade.
 """
 from typing import Optional, List, Dict, Any
 
 from shared.infrastructure.logging.structlog_config import get_logger
 from shared.infrastructure.tracing.context import get_trace_context
 
-logger = get_logger("agent.events")
+logger = get_logger("tracing.events")
+
+_SENSITIVE_KEYS = {
+    "access_token",
+    "token",
+    "api_key",
+    "authorization",
+    "password",
+    "secret",
+    "app_secret",
+    "key_hash",
+}
+
+
+def _get_logging_options() -> dict[str, Any]:
+    """Retorna opções seguras e estáveis de logging."""
+    return {
+        "log_full_prompts": False,
+        "log_full_responses": False,
+        "log_full_tool_data": False,
+        "preview_chars": 500,
+    }
+
+
+def _truncate_text(value: str, max_chars: int) -> str:
+    """Trunca texto para preview de log."""
+    if len(value) <= max_chars:
+        return value
+    return f"{value[:max_chars]}...[truncated]"
+
+
+def _is_sensitive_key(key: Any) -> bool:
+    """Identifica nomes de chave sensíveis para redaction."""
+    key_lower = str(key).lower()
+    return key_lower in _SENSITIVE_KEYS or any(marker in key_lower for marker in ("token", "secret", "password"))
+
+
+def _sanitize_value(value: Any, *, max_chars: int) -> Any:
+    """Sanitiza valor arbitrário recursivamente para log seguro."""
+    if isinstance(value, dict):
+        return {
+            key: "***REDACTED***" if _is_sensitive_key(key) else _sanitize_value(val, max_chars=max_chars)
+            for key, val in value.items()
+        }
+
+    if isinstance(value, list):
+        return [_sanitize_value(item, max_chars=max_chars) for item in value]
+
+    if isinstance(value, tuple):
+        return tuple(_sanitize_value(item, max_chars=max_chars) for item in value)
+
+    if isinstance(value, str):
+        return _truncate_text(value, max_chars=max_chars)
+
+    return value
 
 
 # ============================================================================
@@ -131,23 +185,37 @@ def log_llm_call(
     model: Optional[str] = None
 ):
     """Loga chamada completa ao LLM (prompt + response)"""
-    # Log prompt
+    options = _get_logging_options()
+    prompt_preview = _truncate_text(prompt, max_chars=options["preview_chars"])
+    response_preview = _truncate_text(response, max_chars=options["preview_chars"])
+
+    prompt_payload = {
+        **get_trace_context(),
+        "prompt_type": prompt_type,
+        "prompt_preview": prompt_preview,
+        "prompt_tokens": prompt_tokens,
+        "model": model,
+    }
+    if options["log_full_prompts"]:
+        prompt_payload["prompt_full"] = prompt
+
     logger.debug(
         "llm_prompt_sent",
-        **get_trace_context(),
-        prompt_type=prompt_type,
-        prompt_full=prompt,
-        prompt_tokens=prompt_tokens,
-        model=model
+        **prompt_payload,
     )
 
-    # Log response
+    response_payload = {
+        **get_trace_context(),
+        "response_preview": response_preview,
+        "response_tokens": response_tokens,
+        "duration_ms": duration_ms,
+    }
+    if options["log_full_responses"]:
+        response_payload["response_full"] = response
+
     logger.debug(
         "llm_response_received",
-        **get_trace_context(),
-        response_full=response,
-        response_tokens=response_tokens,
-        duration_ms=duration_ms
+        **response_payload,
     )
 
 
@@ -229,14 +297,25 @@ def log_tool_call(
     status: str = "success"
 ):
     """Loga execução de ferramenta"""
+    options = _get_logging_options()
+    sanitized_params = _sanitize_value(params, max_chars=options["preview_chars"])
+    sanitized_result = _sanitize_value(result, max_chars=options["preview_chars"])
+
+    payload = {
+        **get_trace_context(),
+        "tool_name": tool_name,
+        "tool_params": sanitized_params,
+        "status": status,
+        "duration_ms": duration_ms,
+    }
+    if options["log_full_tool_data"]:
+        payload["result_full"] = sanitized_result
+    else:
+        payload["result_preview"] = _truncate_text(str(sanitized_result), max_chars=options["preview_chars"])
+
     logger.info(
         "tool_call_end",
-        **get_trace_context(),
-        tool_name=tool_name,
-        tool_params=params,
-        result_full=result,
-        status=status,
-        duration_ms=duration_ms
+        **payload,
     )
 
 
@@ -248,11 +327,14 @@ def log_tool_call_error(
     duration_ms: float
 ):
     """Loga erro em execução de ferramenta"""
+    options = _get_logging_options()
+    sanitized_params = _sanitize_value(params, max_chars=options["preview_chars"])
+
     logger.error(
         "tool_call_error",
         **get_trace_context(),
         tool_name=tool_name,
-        tool_params=params,
+        tool_params=sanitized_params,
         error_type=error_type,
         error_message=error_message,
         duration_ms=duration_ms

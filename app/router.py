@@ -1,7 +1,6 @@
 """
 Router agregador da API v1 - exclusivo para Machine Learning.
 Facebook Ads roda em processo separado (porta 8002).
-Agente IA roda em processo separado (porta 8001).
 """
 
 from fastapi import APIRouter
@@ -11,6 +10,7 @@ from fastapi import APIRouter
 from projects.ml.api.health import router as health_router
 from projects.ml.api.predictions import router as predictions_router
 from projects.ml.api.forecasts import router as forecasts_router
+from projects.ml.api.impact import router as impact_router
 from projects.ml.api.classifications import router as classifications_router
 from projects.ml.api.recommendations import router as recommendations_router
 from projects.ml.api.anomalies import router as anomalies_router
@@ -40,6 +40,12 @@ authenticated_router.include_router(
     forecasts_router,
     prefix="/forecasts",
     tags=["Forecasts"]
+)
+
+authenticated_router.include_router(
+    impact_router,
+    prefix="/impact",
+    tags=["Impacto Causal"]
 )
 
 authenticated_router.include_router(

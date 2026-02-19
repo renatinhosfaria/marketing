@@ -33,13 +33,38 @@ class AgentSettings(BaseSettings):
     store_embedding_model: str = "openai:text-embedding-3-small"
     store_embedding_dims: int = 1536
 
+    # Supervisor
+    supervisor_max_history_messages: int = 20
+    agent_context_messages: int = 5  # Mensagens de historico enviadas aos agentes
+
+    # LLM Timeouts (segundos)
+    llm_timeout: int = 60  # Timeout padrao para chamadas LLM
+    supervisor_timeout: int = 15  # Supervisor usa modelo leve — timeout curto
+
     # Streaming
     sse_keepalive_interval: int = 15
+
+    # Auth
+    api_key_hash: str = ""  # SHA-256 hex do AGENT_API_KEY. Vazio = auth desabilitada.
+    require_auth: bool = True  # False permite requests sem key (dev local)
+    runtime_user_id: str = "system"  # Identidade estavel no modo single-user.
+    runtime_user_name: str = "System User"
 
     # Safety
     max_budget_change_pct: float = 50.0
     auto_approve_threshold: float = 0.0
-    approval_token_secret: str = "change-me-in-env"
+    approval_token_secret: str = "change-me"
+
+    # Rollout flags
+    enable_strict_write_path: bool = True
+    enable_ml_endpoint_fixes: bool = True
+    enable_agent_jobs: bool = True
+
+    # Rate limit do Agent API
+    rate_limit_enabled: bool = True
+    rate_limit_requests_per_minute: int = 120
+    rate_limit_requests_per_hour: int = 3000
+    rate_limit_burst: int = 20
 
     # LangSmith
     langsmith_tracing: bool = False

@@ -1,0 +1,243 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - img [ref=e7]
+          - generic [ref=e9]: Marketing
+        - button [ref=e10]:
+          - img [ref=e11]
+      - navigation [ref=e14]:
+        - link "Facebook Ads" [ref=e15] [cursor=pointer]:
+          - /url: /app/facebook-ads
+          - img [ref=e16]
+          - text: Facebook Ads
+        - link "ML Analytics" [ref=e18] [cursor=pointer]:
+          - /url: /app/ml
+          - img [ref=e19]
+          - text: ML Analytics
+        - link "Agente IA" [ref=e29] [cursor=pointer]:
+          - /url: /app/ai-agent
+          - img [ref=e30]
+          - text: Agente IA
+      - generic [ref=e34]:
+        - generic [ref=e36]: AD
+        - generic [ref=e37]:
+          - paragraph [ref=e38]: Administrador
+          - paragraph [ref=e39]: Gestor
+    - generic [ref=e40]:
+      - banner [ref=e41]:
+        - heading "Agente IA" [level=1] [ref=e42]
+      - main [ref=e43]:
+        - generic [ref=e45]:
+          - generic [ref=e51]:
+            - generic [ref=e52]:
+              - img [ref=e53]
+              - generic [ref=e56]:
+                - heading "Agente de Trafego Pago" [level=1] [ref=e57]
+                - paragraph [ref=e58]: Analises e recomendacoes em tempo real
+            - generic [ref=e59]:
+              - generic [ref=e62]: Online
+              - combobox [ref=e63]:
+                - option "Famachat (act_24036721645944375)" [selected]
+              - button "Debug" [ref=e64]:
+                - img
+                - generic [ref=e65]: Debug
+          - generic [ref=e66]:
+            - complementary [ref=e68]:
+              - generic [ref=e69]:
+                - heading "Conversas" [level=3] [ref=e70]
+                - button "Nova conversa" [ref=e71]:
+                  - img
+              - generic [ref=e73]:
+                - button "Compare minhas top 3 campanhas 2 mensagens 10/02" [active] [ref=e74]:
+                  - generic [ref=e75]: Compare minhas top 3 campanhas
+                  - generic [ref=e76]:
+                    - generic [ref=e77]: 2 mensagens
+                    - generic [ref=e78]: 10/02
+                - button "Excluir conversa" [ref=e79]:
+                  - img
+            - generic [ref=e81]:
+              - generic [ref=e82]:
+                - generic [ref=e83]:
+                  - img [ref=e84]
+                  - heading "Assistente de Tráfego Pago" [level=2] [ref=e87]
+                - generic [ref=e88]:
+                  - button "Nova conversa" [ref=e89]:
+                    - img
+                  - button "Limpar conversa" [ref=e90]:
+                    - img
+              - generic [ref=e94]:
+                - generic [ref=e111]:
+                  - img [ref=e113]
+                  - generic [ref=e117]: Compare minhas top 3 campanhas
+                - generic [ref=e118]:
+                  - img [ref=e120]
+                  - generic [ref=e124]:
+                    - heading "Resumo Executivo" [level=2] [ref=e125]
+                    - list [ref=e126]:
+                      - listitem [ref=e127]:
+                        - text: Você tem uma base razoável de campanhas vencedoras (
+                        - strong [ref=e128]: 8 HIGH_PERFORMER
+                        - text: ), com
+                        - strong [ref=e129]: CPL competitivo (~R$ 6–11)
+                        - text: .
+                      - listitem [ref=e130]:
+                        - text: "Ao mesmo tempo, existe um risco relevante de desperdício:"
+                        - strong [ref=e131]: 16 UNDERPERFORMER
+                        - text: (maior grupo individual), sugerindo necessidade de corte/otimização.
+                      - listitem [ref=e132]:
+                        - text: A comparação “campanha a campanha” via ferramenta
+                        - strong [ref=e133]: compare_campaigns
+                        - text: ficou
+                        - strong [ref=e134]: parcialmente bloqueada
+                        - text: por um
+                        - strong [ref=e135]: erro técnico de timezone
+                        - text: ao tentar puxar ranking nos
+                        - strong [ref=e136]: últimos 30 dias
+                        - text: .
+                    - separator [ref=e137]
+                    - heading "Alertas Críticos (anomalias e riscos)" [level=2] [ref=e138]
+                    - list [ref=e139]:
+                      - listitem [ref=e140]:
+                        - strong [ref=e141]: "Falha técnica impedindo o comparativo completo (30d):"
+                        - text: "Erro:"
+                        - code [ref=e142]: "`can't subtract offset-naive and offset-aware datetimes`"
+                        - text: "(mistura de datetime com/sem fuso). Impacto: não foi possível gerar o ranking/“top 3” automaticamente em 30 dias pelo fluxo padrão."
+                      - listitem [ref=e143]:
+                        - strong [ref=e144]: "Alto volume em baixa performance:"
+                        - strong [ref=e145]: 16 UNDERPERFORMER
+                        - text: → forte indicativo de verba mal alocada se ainda estiverem ativas.
+                      - listitem [ref=e146]:
+                        - strong [ref=e147]: "Duplicidade no “top 3” retornado:"
+                        - text: a campanha
+                        - strong [ref=e148]: "120237856444520206"
+                        - text: apareceu 2x; o “3º lugar real” foi ajustado manualmente.
+                    - separator [ref=e149]
+                    - heading "Análise de Performance (o que dá para concluir agora)" [level=2] [ref=e150]
+                    - 'heading "Distribuição por tier (config_id: 14)" [level=3] [ref=e151]'
+                    - list [ref=e152]:
+                      - listitem [ref=e153]:
+                        - strong [ref=e154]: "HIGH_PERFORMER:"
+                        - strong [ref=e155]: "8"
+                      - listitem [ref=e156]:
+                        - strong [ref=e157]: "MODERATE:"
+                        - strong [ref=e158]: "13"
+                      - listitem [ref=e159]:
+                        - strong [ref=e160]: "LOW:"
+                        - strong [ref=e161]: "13"
+                      - listitem [ref=e162]:
+                        - strong [ref=e163]: "UNDERPERFORMER:"
+                        - strong [ref=e164]: "16"
+                    - 'heading "Top campanhas (7 dias) — HIGH_PERFORMER 1) 120234212879950206 — CPL: R$ 6,71 | Leads: 6 | Spend: R$ 40,27 | Confiança: 85 2) 120237856444520206 — CPL: R$ 6,36 | Leads: 4 | Spend: R$ 25,43 | Confiança: 85 3) 120229994165380206 — CPL: R$ 11,22 | Leads: 4 | Spend: R$ 44,89 | Confiança: 67,5 Leitura rápida:" [level=3] [ref=e165]':
+                      - text: Top campanhas (7 dias) — HIGH_PERFORMER 1)
+                      - strong [ref=e166]: "120234212879950206"
+                      - text: —
+                      - strong [ref=e167]: "CPL: R$ 6,71"
+                      - text: "|"
+                      - strong [ref=e168]: "Leads: 6"
+                      - text: "|"
+                      - strong [ref=e169]: "Spend: R$ 40,27"
+                      - text: "| Confiança:"
+                      - strong [ref=e170]: "85"
+                      - text: 2)
+                      - strong [ref=e171]: "120237856444520206"
+                      - text: —
+                      - strong [ref=e172]: "CPL: R$ 6,36"
+                      - text: "|"
+                      - strong [ref=e173]: "Leads: 4"
+                      - text: "|"
+                      - strong [ref=e174]: "Spend: R$ 25,43"
+                      - text: "| Confiança:"
+                      - strong [ref=e175]: "85"
+                      - text: 3)
+                      - strong [ref=e176]: "120229994165380206"
+                      - text: —
+                      - strong [ref=e177]: "CPL: R$ 11,22"
+                      - text: "|"
+                      - strong [ref=e178]: "Leads: 4"
+                      - text: "|"
+                      - strong [ref=e179]: "Spend: R$ 44,89"
+                      - text: "| Confiança:"
+                      - strong [ref=e180]: 67,5
+                      - text: "Leitura rápida:"
+                    - list [ref=e181]:
+                      - listitem [ref=e182]:
+                        - strong [ref=e183]: "Melhor CPL:"
+                        - strong [ref=e184]: 120237856444520206 (R$ 6,36)
+                        - text: ", mas com"
+                        - strong [ref=e185]: menor volume
+                        - text: (4 leads).
+                      - listitem [ref=e186]:
+                        - strong [ref=e187]: "Melhor volume de leads:"
+                        - strong [ref=e188]: 120234212879950206 (6 leads)
+                        - text: mantendo CPL excelente (
+                        - strong [ref=e189]: R$ 6,71
+                        - text: ).
+                      - listitem [ref=e190]:
+                        - strong [ref=e191]: "Ponto de atenção mesmo dentro das “top”:"
+                        - strong [ref=e192]: "120229994165380206"
+                        - text: tem
+                        - strong [ref=e193]: CPL mais alto (R$ 11,22)
+                        - text: e
+                        - strong [ref=e194]: confiança menor (67,5)
+                        - text: .
+                    - separator [ref=e195]
+                    - heading "Recomendações (ações objetivas) 1) Escalar com cuidado as vencedoras" [level=2] [ref=e196]:
+                      - text: Recomendações (ações objetivas) 1)
+                      - strong [ref=e197]: Escalar com cuidado as vencedoras
+                    - list [ref=e198]:
+                      - listitem [ref=e199]: "Priorize aumento de verba/entrega em:"
+                      - listitem [ref=e200]:
+                        - strong [ref=e201]: "120234212879950206"
+                        - text: (melhor equilíbrio entre
+                        - strong [ref=e202]: volume
+                        - text: e
+                        - strong [ref=e203]: CPL
+                        - text: )
+                      - listitem [ref=e204]:
+                        - strong [ref=e205]: "120237856444520206"
+                        - text: (melhor
+                        - strong [ref=e206]: CPL
+                        - text: ", validar se dá para ganhar volume) 2)"
+                        - strong [ref=e207]: Auditar e cortar perdas rapidamente
+                      - listitem [ref=e208]:
+                        - text: Revisar as
+                        - strong [ref=e209]: 16 UNDERPERFORMER
+                        - text: "e definir ação por regra simples:"
+                      - listitem [ref=e210]:
+                        - strong [ref=e211]: Pausar
+                        - text: as sem tração (poucos leads e CPL alto)
+                      - listitem [ref=e212]:
+                        - strong [ref=e213]: Ajustar
+                        - text: criativo/público/landing nas que têm sinal, mas custo ruim 3)
+                        - strong [ref=e214]: Rever a 3ª “top” antes de escalar
+                      - listitem [ref=e215]:
+                        - strong [ref=e216]: "120229994165380206"
+                        - text: ": só aumente investimento após validar estabilidade (confiança menor e CPL bem acima das duas primeiras)."
+                    - separator [ref=e217]
+                    - heading "O que falta para eu fazer a comparação completa (lado a lado) A análise ficou incompleta na parte de comparação automática porque o agente de ranking falhou por timezone. Para eu rodar compare_campaigns corretamente, você pode escolher um caminho:" [level=2] [ref=e218]:
+                      - text: O que falta para eu fazer a comparação completa (lado a lado) A análise ficou
+                      - strong [ref=e219]: incompleta na parte de comparação automática
+                      - text: porque o agente de ranking falhou por timezone. Para eu rodar
+                      - strong [ref=e220]: compare_campaigns
+                      - text: "corretamente, você pode escolher um caminho:"
+                    - list [ref=e221]:
+                      - listitem [ref=e222]:
+                        - strong [ref=e223]: "Opção A (mais rápida):"
+                        - text: me envie
+                        - strong [ref=e224]: 3 campaign_ids
+                        - text: e o período (
+                        - strong [ref=e225]: 7, 14 ou 30 dias
+                        - text: ).
+                      - listitem [ref=e226]:
+                        - strong [ref=e227]: "Opção B:"
+                        - text: pedir ao time técnico corrigir o bug de timezone no endpoint; depois você me diz “use os top 3 por leads nos últimos 30 dias”. Se você quiser, eu também posso listar/avaliar as
+                        - strong [ref=e228]: 3 piores UNDERPERFORMER
+                        - text: para decidir quais pausar primeiro (assim que você autorizar esse recorte).
+              - generic [ref=e109]:
+                - textbox "Pergunte sobre suas campanhas..." [ref=e110]
+                - button "Enviar" [disabled]:
+                  - img
+  - region "Notifications alt+T"
+  - alert [ref=e50]

@@ -1,0 +1,8 @@
+{
+  "best_params": {
+    "changepoint_prior_scale": 0.05,
+    "seasonality_prior_scale": 1.0
+  },
+  "metric": "leads",
+  "tuned_at": "2026-02-15T05:35:54.209108"
+}

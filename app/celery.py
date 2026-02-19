@@ -19,6 +19,8 @@ celery_app = Celery(
         "projects.facebook_ads.jobs.sync_job",
         "projects.facebook_ads.jobs.insights_consolidation",
         "projects.facebook_ads.jobs.token_refresh",
+        "projects.agent.jobs.impact",
+        "projects.agent.jobs.retention",
     ]
 )
 
@@ -224,6 +226,27 @@ celery_app.conf.update(
             "schedule": crontab(hour=6, minute=30),
             "options": {"queue": "default"},
         },
+
+        # Agent - Calculo de impacto diario às 06:15
+        "agent-daily-impact-analysis": {
+            "task": "projects.agent.jobs.impact.calculate_action_impact",
+            "schedule": crontab(hour=6, minute=15),
+            "options": {"queue": "default"},
+        },
+
+        # Agent - Limpeza de checkpoints semanal (domingo 03:00)
+        "agent-weekly-checkpoint-cleanup": {
+            "task": "projects.agent.jobs.retention.cleanup_agent_checkpoints",
+            "schedule": crontab(day_of_week=0, hour=3, minute=0),
+            "options": {"queue": "default"},
+        },
+
+        # Agent - Limpeza de store no primeiro domingo do mes (04:00)
+        "agent-monthly-store-cleanup": {
+            "task": "projects.agent.jobs.retention.cleanup_agent_store",
+            "schedule": crontab(day_of_week=0, day_of_month="1-7", hour=4, minute=0),
+            "options": {"queue": "default"},
+        },
     },
 
     # Filas
@@ -241,5 +264,17 @@ celery_app.conf.update(
         "projects.ml.jobs.scheduled_tasks.daily_model_retraining": {"queue": "training"},
         "projects.ml.jobs.scheduled_tasks.*": {"queue": "ml"},
         "projects.facebook_ads.jobs.*": {"queue": "default"},
+        "projects.agent.jobs.*": {"queue": "default"},
     },
 )
+
+
+# Observabilidade: inicializar quando rodando como worker
+from celery.signals import worker_init
+
+@worker_init.connect
+def init_worker_observability(**kwargs):
+    """Inicializa tracing e métricas quando o worker Celery startar."""
+    from shared.observability import setup_tracing, setup_celery_observability
+    setup_tracing(service_name="celery-worker")
+    setup_celery_observability(celery_app)

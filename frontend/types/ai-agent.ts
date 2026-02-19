@@ -32,6 +32,13 @@ export interface SSEEvent {
   data: Record<string, any>;
 }
 
+export interface ResumePayload {
+  approved: boolean;
+  approval_token: string;
+  new_budget_override?: number;
+  override_value?: number;
+}
+
 export type AgentId =
   | 'health_monitor'
   | 'performance_analyst'

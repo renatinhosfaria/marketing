@@ -66,10 +66,11 @@ def _parse_date_params(
     presets = {
         "today": (today, today),
         "yesterday": (today - timedelta(days=1), today - timedelta(days=1)),
-        "last_7d": (today - timedelta(days=7), today),
-        "last_14d": (today - timedelta(days=14), today),
-        "last_30d": (today - timedelta(days=30), today),
-        "last_90d": (today - timedelta(days=90), today),
+        # "last_*" usa dias completos anteriores (alinhado ao Ads Manager), excluindo hoje
+        "last_7d": (today - timedelta(days=7), today - timedelta(days=1)),
+        "last_14d": (today - timedelta(days=14), today - timedelta(days=1)),
+        "last_30d": (today - timedelta(days=30), today - timedelta(days=1)),
+        "last_90d": (today - timedelta(days=90), today - timedelta(days=1)),
         "this_month": (today.replace(day=1), today),
         "last_month": ((today.replace(day=1) - timedelta(days=1)).replace(day=1), today.replace(day=1) - timedelta(days=1)),
         "this_year": (today.replace(month=1, day=1), today),
@@ -104,6 +105,12 @@ async def get_kpis(
 
     # Buscar dados da tabela history (exceto se for only_today)
     if not use_only_today:
+        # Exclude today from history when also using today table to avoid double-counting
+        history_until = until
+        if use_today:
+            today_dt = datetime.combine(get_today_sao_paulo(), datetime.min.time())
+            history_until = today_dt - timedelta(seconds=1)
+
         result = await db.execute(
             select(
                 func.coalesce(func.sum(SistemaFacebookAdsInsightsHistory.spend), 0).label("spend"),
@@ -116,7 +123,7 @@ async def get_kpis(
                 and_(
                     SistemaFacebookAdsInsightsHistory.config_id == config_id,
                     SistemaFacebookAdsInsightsHistory.date >= since,
-                    SistemaFacebookAdsInsightsHistory.date <= until,
+                    SistemaFacebookAdsInsightsHistory.date <= history_until,
                 )
             )
         )
@@ -246,6 +253,12 @@ async def get_daily_insights(
     
     # Buscar dados da tabela history (exceto se for only_today)
     if not use_only_today:
+        # Exclude today from history when also using today table to avoid double-counting
+        history_until = until
+        if use_today:
+            today_dt = datetime.combine(get_today_sao_paulo(), datetime.min.time())
+            history_until = today_dt - timedelta(seconds=1)
+
         result = await db.execute(
             select(
                 func.date(SistemaFacebookAdsInsightsHistory.date).label("day"),
@@ -259,7 +272,7 @@ async def get_daily_insights(
                 and_(
                     SistemaFacebookAdsInsightsHistory.config_id == config_id,
                     SistemaFacebookAdsInsightsHistory.date >= since,
-                    SistemaFacebookAdsInsightsHistory.date <= until,
+                    SistemaFacebookAdsInsightsHistory.date <= history_until,
                 )
             ).group_by(
                 func.date(SistemaFacebookAdsInsightsHistory.date)
@@ -358,6 +371,12 @@ async def get_campaign_insights(
 
     # Buscar dados da tabela history (exceto se for only_today)
     if not use_only_today:
+        # Exclude today from history when also using today table to avoid double-counting
+        history_until = until
+        if use_today:
+            today_dt = datetime.combine(get_today_sao_paulo(), datetime.min.time())
+            history_until = today_dt - timedelta(seconds=1)
+
         result = await db.execute(
             select(
                 SistemaFacebookAdsInsightsHistory.campaign_id,
@@ -371,7 +390,7 @@ async def get_campaign_insights(
                 and_(
                     SistemaFacebookAdsInsightsHistory.config_id == config_id,
                     SistemaFacebookAdsInsightsHistory.date >= since,
-                    SistemaFacebookAdsInsightsHistory.date <= until,
+                    SistemaFacebookAdsInsightsHistory.date <= history_until,
                 )
             ).group_by(
                 SistemaFacebookAdsInsightsHistory.campaign_id

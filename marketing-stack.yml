@@ -1,0 +1,459 @@
+# Marketing Stack - Docker Swarm + Traefik
+# Deploy: docker stack deploy -c marketing-stack.yml marketing
+#
+# Serviços:
+#   - marketing-frontend (Next.js) → marketing.famachat.com.br
+#   - marketing-api (FastAPI ML) → marketing.famachat.com.br/api/
+#   - marketing-fb-ads (FastAPI FB Ads) → marketing.famachat.com.br/api/v1/facebook-ads
+#   - marketing-worker (Celery ML)
+#   - marketing-fb-ads-worker (Celery FB Ads)
+#   - marketing-beat (Celery Beat Scheduler)
+#   - marketing-redis (Redis dedicado)
+#   - marketing-flower (Monitoring) → marketing.famachat.com.br/flower/
+
+version: "3.7"
+
+services:
+  # ==================== Frontend Next.js ====================
+  marketing-frontend:
+    image: marketing-frontend:latest
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    environment:
+      - NODE_ENV=production
+      - API_INTERNAL_URL=http://marketing-api:8000
+      - FB_ADS_INTERNAL_URL=http://marketing-fb-ads:8002
+      - AGENT_INTERNAL_URL=http://marketing-agent:8001
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+        delay: 5s
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=network_public"
+        # Rota principal - Frontend (prioridade baixa, catch-all)
+        - "traefik.http.routers.marketing_frontend.rule=Host(`marketing.famachat.com.br`) && !PathPrefix(`/api/`) && !PathPrefix(`/flower/`)"
+        - "traefik.http.routers.marketing_frontend.entrypoints=websecure"
+        - "traefik.http.routers.marketing_frontend.priority=1"
+        - "traefik.http.routers.marketing_frontend.tls=true"
+        - "traefik.http.routers.marketing_frontend.tls.certresolver=letsencryptresolver"
+        - "traefik.http.routers.marketing_frontend.service=marketing_marketing-frontend"
+        - "traefik.http.services.marketing_marketing-frontend.loadbalancer.server.port=3001"
+        - "traefik.http.services.marketing_marketing-frontend.loadbalancer.passHostHeader=true"
+    networks:
+      - network_public
+      - marketing-internal
+
+  # ==================== API FastAPI (ML) ====================
+  marketing-api:
+    image: marketing:latest
+    environment:
+      - DATABASE_URL=postgresql://postgres:IwOLgVnyOfbN@postgres:5432/marketing?sslmode=disable
+      - REDIS_URL=redis://marketing-redis:6379/0
+      - ML_API_KEY=${ML_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - MODELS_STORAGE_PATH=/app/models_storage
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DEBUG=${DEBUG:-false}
+    volumes:
+      - models_storage:/app/models_storage
+      - logs:/app/logs
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+        delay: 5s
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=network_public"
+        # Rota /api/ genérica (prioridade média)
+        - "traefik.http.routers.marketing_api.rule=Host(`marketing.famachat.com.br`) && PathPrefix(`/api/`)"
+        - "traefik.http.routers.marketing_api.entrypoints=websecure"
+        - "traefik.http.routers.marketing_api.priority=5"
+        - "traefik.http.routers.marketing_api.tls=true"
+        - "traefik.http.routers.marketing_api.tls.certresolver=letsencryptresolver"
+        - "traefik.http.routers.marketing_api.service=marketing_marketing-api"
+        - "traefik.http.services.marketing_marketing-api.loadbalancer.server.port=8000"
+        - "traefik.http.services.marketing_marketing-api.loadbalancer.passHostHeader=true"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - network_public
+      - marketing-internal
+
+  # ==================== Facebook Ads (FastAPI separado) ====================
+  marketing-fb-ads:
+    image: marketing:latest
+    command: ["uvicorn", "app.fb_ads_main:app", "--host", "0.0.0.0", "--port", "8002"]
+    environment:
+      - DATABASE_URL=postgresql://postgres:IwOLgVnyOfbN@postgres:5432/marketing?sslmode=disable
+      - REDIS_URL=redis://marketing-redis:6379/0
+      - ML_API_KEY=${ML_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - FACEBOOK_APP_ID=${FACEBOOK_APP_ID:-}
+      - FACEBOOK_APP_SECRET=${FACEBOOK_APP_SECRET:-}
+      - FACEBOOK_OAUTH_CALLBACK_URL=${FACEBOOK_OAUTH_CALLBACK_URL:-}
+      - FACEBOOK_OAUTH_FRONTEND_REDIRECT_URL=${FACEBOOK_OAUTH_FRONTEND_REDIRECT_URL:-}
+      - FACEBOOK_TOKEN_ENCRYPTION_KEY=${FACEBOOK_TOKEN_ENCRYPTION_KEY:-}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DEBUG=${DEBUG:-false}
+    volumes:
+      - logs:/app/logs
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+        delay: 5s
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=network_public"
+        # Rota /api/v1/facebook-ads (prioridade ALTA - antes de /api/ genérico)
+        - "traefik.http.routers.marketing_fb_ads.rule=Host(`marketing.famachat.com.br`) && PathPrefix(`/api/v1/facebook-ads`)"
+        - "traefik.http.routers.marketing_fb_ads.entrypoints=websecure"
+        - "traefik.http.routers.marketing_fb_ads.priority=10"
+        - "traefik.http.routers.marketing_fb_ads.tls=true"
+        - "traefik.http.routers.marketing_fb_ads.tls.certresolver=letsencryptresolver"
+        - "traefik.http.routers.marketing_fb_ads.service=marketing_marketing-fb-ads"
+        - "traefik.http.services.marketing_marketing-fb-ads.loadbalancer.server.port=8002"
+        - "traefik.http.services.marketing_marketing-fb-ads.loadbalancer.passHostHeader=true"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/api/v1/facebook-ads/health/simple"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - network_public
+      - marketing-internal
+
+  # ==================== Agent API (Multi-Agent Ecosystem) ====================
+  marketing-agent:
+    image: marketing:latest
+    command: ["uvicorn", "app.agent_main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "1", "--loop", "uvloop"]
+    environment:
+      - DATABASE_URL=postgresql://postgres:IwOLgVnyOfbN@postgres:5432/marketing?sslmode=disable
+      - REDIS_URL=redis://marketing-redis:6379/1
+      - AGENT_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - AGENT_OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - AGENT_ML_API_URL=http://marketing-api:8000
+      - AGENT_REQUIRE_AUTH=false
+      - AGENT_APPROVAL_TOKEN_SECRET=${AGENT_APPROVAL_TOKEN_SECRET:-change-me}
+      - AGENT_ENABLE_STRICT_WRITE_PATH=${AGENT_ENABLE_STRICT_WRITE_PATH:-true}
+      - AGENT_ENABLE_ML_ENDPOINT_FIXES=${AGENT_ENABLE_ML_ENDPOINT_FIXES:-true}
+      - AGENT_ENABLE_AGENT_JOBS=${AGENT_ENABLE_AGENT_JOBS:-true}
+      - LANGSMITH_TRACING=${LANGSMITH_TRACING:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+        delay: 5s
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=network_public"
+        # Rota /api/v1/agent (prioridade ALTA - antes de /api/ genérico)
+        - "traefik.http.routers.marketing_agent.rule=Host(`marketing.famachat.com.br`) && PathPrefix(`/api/v1/agent`)"
+        - "traefik.http.routers.marketing_agent.entrypoints=websecure"
+        - "traefik.http.routers.marketing_agent.priority=10"
+        - "traefik.http.routers.marketing_agent.tls=true"
+        - "traefik.http.routers.marketing_agent.tls.certresolver=letsencryptresolver"
+        - "traefik.http.routers.marketing_agent.service=marketing_marketing-agent"
+        - "traefik.http.services.marketing_marketing-agent.loadbalancer.server.port=8001"
+        - "traefik.http.services.marketing_marketing-agent.loadbalancer.passHostHeader=true"
+        # SSE: desabilitar buffering para streaming
+        - "traefik.http.services.marketing_marketing-agent.loadbalancer.responseForwarding.flushInterval=1ms"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/v1/agent/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - network_public
+      - marketing-internal
+
+  # ==================== Celery Worker ML (filas: training, ml) ====================
+  marketing-worker:
+    image: marketing:latest
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.celery inspect ping -d ml-worker@$$HOSTNAME --timeout 10 2>/dev/null | grep -q pong || exit 1"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+    command: >
+      celery -A app.celery worker
+      --loglevel=info
+      --concurrency=2
+      --queues=training,ml
+      --hostname=ml-worker@%h
+    environment:
+      - DATABASE_URL=postgresql://postgres:IwOLgVnyOfbN@postgres:5432/marketing?sslmode=disable
+      - REDIS_URL=redis://marketing-redis:6379/0
+      - ML_API_KEY=${ML_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - MODELS_STORAGE_PATH=/app/models_storage
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - models_storage:/app/models_storage
+      - logs:/app/logs
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+        delay: 5s
+      resources:
+        limits:
+          cpus: '2'
+          memory: 3G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+    networks:
+      - network_public
+      - marketing-internal
+
+  # ==================== Celery Worker Facebook Ads (fila: default) ====================
+  marketing-fb-ads-worker:
+    image: marketing:latest
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.celery inspect ping -d fb-ads-worker@$$HOSTNAME --timeout 10 2>/dev/null | grep -q pong || exit 1"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+    command: >
+      celery -A app.celery worker
+      --loglevel=info
+      --concurrency=2
+      --queues=default
+      --hostname=fb-ads-worker@%h
+    environment:
+      - DATABASE_URL=postgresql://postgres:IwOLgVnyOfbN@postgres:5432/marketing?sslmode=disable
+      - REDIS_URL=redis://marketing-redis:6379/0
+      - ML_API_KEY=${ML_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - FACEBOOK_APP_ID=${FACEBOOK_APP_ID:-}
+      - FACEBOOK_APP_SECRET=${FACEBOOK_APP_SECRET:-}
+      - FACEBOOK_TOKEN_ENCRYPTION_KEY=${FACEBOOK_TOKEN_ENCRYPTION_KEY:-}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - logs:/app/logs
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+        delay: 5s
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - network_public
+      - marketing-internal
+
+  # ==================== Celery Beat (Scheduler) ====================
+  marketing-beat:
+    image: marketing:latest
+    user: root
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /var/run/celery/celerybeat-schedule || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    command: >
+      celery -A app.celery beat
+      --loglevel=info
+      --scheduler celery.beat:PersistentScheduler
+      --schedule=/var/run/celery/celerybeat-schedule
+    environment:
+      - DATABASE_URL=postgresql://postgres:IwOLgVnyOfbN@postgres:5432/marketing?sslmode=disable
+      - REDIS_URL=redis://marketing-redis:6379/0
+      - ML_API_KEY=${ML_API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - celerybeat_schedule:/var/run/celery
+      - logs:/app/logs
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+        delay: 5s
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    networks:
+      - marketing-internal
+
+  # ==================== Redis (dedicado para Marketing) ====================
+  marketing-redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+        delay: 5s
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - marketing-internal
+
+  # ==================== Flower (Monitoramento Celery) ====================
+  marketing-flower:
+    image: marketing:latest
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5555/flower/healthcheck || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    command: >
+      celery -A app.celery flower
+      --port=5555
+      --basic_auth=${FLOWER_USER:-admin}:${FLOWER_PASSWORD}
+      --url_prefix=flower
+    environment:
+      - REDIS_URL=redis://marketing-redis:6379/0
+      - FLOWER_USER=${FLOWER_USER:-admin}
+      - FLOWER_PASSWORD=${FLOWER_PASSWORD}
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+        delay: 5s
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=network_public"
+        # Rota /flower/ (prioridade alta)
+        - "traefik.http.routers.marketing_flower.rule=Host(`marketing.famachat.com.br`) && PathPrefix(`/flower/`)"
+        - "traefik.http.routers.marketing_flower.entrypoints=websecure"
+        - "traefik.http.routers.marketing_flower.priority=10"
+        - "traefik.http.routers.marketing_flower.tls=true"
+        - "traefik.http.routers.marketing_flower.tls.certresolver=letsencryptresolver"
+        - "traefik.http.routers.marketing_flower.service=marketing_marketing-flower"
+        - "traefik.http.services.marketing_marketing-flower.loadbalancer.server.port=5555"
+        - "traefik.http.services.marketing_marketing-flower.loadbalancer.passHostHeader=true"
+    networks:
+      - network_public
+      - marketing-internal
+
+# ==================== VOLUMES ====================
+volumes:
+  redis_data:
+    driver: local
+  celerybeat_schedule:
+    driver: local
+  models_storage:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/www/marketing/models_storage
+  logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/www/marketing/logs
+
+# ==================== NETWORKS ====================
+networks:
+  network_public:
+    external: true
+  marketing-internal:
+    driver: overlay

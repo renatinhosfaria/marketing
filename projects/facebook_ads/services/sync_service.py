@@ -22,11 +22,27 @@ logger = get_logger(__name__)
 class SyncService:
     """Orquestra sincronização completa do Facebook Ads."""
 
+    RECENT_DAYS_BACK = 3
+
     def __init__(self, db: AsyncSession):
         self.db = db
         self._campaigns_service = SyncCampaignsService(db)
         self._adsets_ads_service = SyncAdSetsAdsService(db)
         self._insights_service = SyncInsightsService(db)
+
+    @staticmethod
+    def _merge_insights_results(today_result: dict, recent_result: dict) -> dict:
+        """Combina métricas de sync de hoje e de re-consolidação recente."""
+        today_synced = int(today_result.get("synced", 0) or 0)
+        recent_synced = int(recent_result.get("synced", 0) or 0)
+        return {
+            "synced": today_synced + recent_synced,
+            "inserted": int(today_result.get("inserted", 0) or 0) + int(recent_result.get("inserted", 0) or 0),
+            "updated": int(today_result.get("updated", 0) or 0) + int(recent_result.get("updated", 0) or 0),
+            "errors": int(today_result.get("errors", 0) or 0) + int(recent_result.get("errors", 0) or 0),
+            "today_synced": today_synced,
+            "recent_synced": recent_synced,
+        }
 
     async def get_config(self, config_id: int) -> SistemaFacebookAdsConfig:
         """Busca configuração e valida se está ativa."""
@@ -134,11 +150,21 @@ class SyncService:
 
             if sync_type in ("full", "incremental"):
                 # Step 4: Insights de hoje
-                results["insights"] = await self._insights_service.sync_today(config)
+                today_result = await self._insights_service.sync_today(config)
+                recent_result = await self._insights_service.sync_recent_days(
+                    config,
+                    days_back=self.RECENT_DAYS_BACK,
+                )
+                results["insights"] = self._merge_insights_results(today_result, recent_result)
                 sync_history.insights_synced = results["insights"].get("synced", 0)
 
             elif sync_type == "today_only":
-                results["insights"] = await self._insights_service.sync_today(config)
+                today_result = await self._insights_service.sync_today(config)
+                recent_result = await self._insights_service.sync_recent_days(
+                    config,
+                    days_back=self.RECENT_DAYS_BACK,
+                )
+                results["insights"] = self._merge_insights_results(today_result, recent_result)
                 sync_history.insights_synced = results["insights"].get("synced", 0)
 
             elif sync_type == "historical":
