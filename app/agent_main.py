@@ -25,9 +25,12 @@ from shared.db.session import engine
 from projects.agent.api.router import router as agent_router
 from projects.agent.memory.store import create_store_cm
 from projects.agent.memory.checkpointer import create_checkpointer_cm
-from projects.agent.tools.http_client import init_ml_http_client, close_ml_http_client
+from projects.agent.tools.http_client import init_ml_http_client, close_ml_http_client, set_semaphore_factory
 from projects.agent.graph.builder import compile_graph
 from projects.agent.config import agent_settings
+from projects.agent.concurrency.redis_semaphore import RedisSemaphoreFactory
+from projects.agent.resilience.circuit_breaker import CircuitBreakerRegistry, set_registry as set_cb_registry
+from projects.agent.api.session_manager import SSESessionManager
 
 
 # Configurar logging estruturado
@@ -36,16 +39,17 @@ logger = structlog.get_logger(__name__)
 
 
 def _assert_single_worker():
-    """Guardrail: impede startup se detectar multi-worker.
+    """Avisa se detectar multi-worker sem Redis configurado.
 
-    Semaphores in-memory (_ml_api_semaphores, _stream_semaphores) so funcionam
-    com 1 worker. Com 2+, os limites dobram sem controle.
+    Com semaphores Redis, múltiplos workers são suportados.
+    Mantida apenas para logging informativo.
     """
     workers = int(os.environ.get("WEB_CONCURRENCY", "1"))
     if workers > 1:
-        raise RuntimeError(
-            f"WEB_CONCURRENCY={workers} detectado. Agent API requer --workers 1. "
-            "Para escalar, migre semaphores para Redis."
+        logger.info(
+            "agent.multi_worker_detected",
+            workers=workers,
+            note="Semaphores Redis habilitados — escala horizontal suportada.",
         )
 
 
@@ -118,9 +122,40 @@ async def lifespan(app: FastAPI):
         has_api_key_hash=bool(agent_settings.api_key_hash),
     )
 
+    # Inicializar semaphore factory (Redis distribuído)
+    sem_factory = RedisSemaphoreFactory(agent_settings.agent_redis_url)
+    try:
+        await sem_factory.connect()
+        app.state.sem_factory = sem_factory
+    except Exception as e:
+        logger.warning(
+            "redis_semaphore.connect_failed",
+            error=str(e),
+            note="Continuando sem semaphores Redis — single-worker apenas.",
+        )
+        app.state.sem_factory = None
+
+    # Inicializar SSE session manager (Redis Stream para replay)
+    sse_manager = SSESessionManager(agent_settings.agent_redis_url)
+    try:
+        await sse_manager.connect()
+        app.state.sse_session_manager = sse_manager
+    except Exception as e:
+        logger.warning("sse_session_manager.connect_failed", error=str(e))
+        app.state.sse_session_manager = None
+
+    # Inicializar circuit breaker registry
+    cb_registry = CircuitBreakerRegistry()
+    set_cb_registry(cb_registry)
+    app.state.circuit_breaker_registry = cb_registry
+
     # Inicializar componentes via context managers
     async with create_store_cm() as store, create_checkpointer_cm() as checkpointer:
         ml_client = init_ml_http_client()
+
+        # Injetar semaphore factory no http_client
+        if app.state.sem_factory:
+            set_semaphore_factory(app.state.sem_factory)
 
         # Compilar grafo UMA VEZ (caro — nao recompilar por request)
         graph = compile_graph(checkpointer=checkpointer, store=store)
@@ -135,9 +170,12 @@ async def lifespan(app: FastAPI):
 
         yield
 
-        # Shutdown: cleanup de conexoes HTTP
+        # Shutdown: cleanup de conexoes HTTP e Redis
         logger.info("Encerrando FamaChat Agent API")
         await close_ml_http_client()
+
+    await sse_manager.close()
+    await sem_factory.close()
 
 
 # Criar aplicacao FastAPI

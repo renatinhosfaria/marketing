@@ -16,6 +16,7 @@ Funcoes:
 import asyncio
 import time
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
 import httpx
 
@@ -23,20 +24,28 @@ from projects.agent.config import agent_settings
 from projects.agent.tools.result import ToolResult, tool_success, tool_error
 from projects.agent.observability.metrics import ml_api_latency, tool_errors_total
 
+if TYPE_CHECKING:
+    from projects.agent.concurrency.redis_semaphore import RedisSemaphoreFactory
 
-# Semaphores por account — limita concorrencia real
+# Semaphores in-memory: fallback quando Redis nao esta disponivel (testes/dev)
 _ml_api_semaphores: dict[str, asyncio.Semaphore] = defaultdict(
     lambda: asyncio.Semaphore(5)  # Max 5 chamadas ML API simultaneas por account
 )
-_fb_api_semaphores: dict[str, asyncio.Semaphore] = defaultdict(
-    lambda: asyncio.Semaphore(3)  # Max 3 chamadas Facebook API simultaneas por account
-)
+
+# Factory de semaphores Redis — injetada no lifespan via set_semaphore_factory()
+_sem_factory: "RedisSemaphoreFactory | None" = None
 
 # Client HTTP persistente — inicializado no lifespan da app.
 # Reutiliza pool de conexoes (keep-alive HTTP/1.1).
 _ml_http_client: httpx.AsyncClient | None = None
 
 ML_API_URL = agent_settings.ml_api_url
+
+
+def set_semaphore_factory(factory: "RedisSemaphoreFactory"):
+    """Injeta a factory de semaphores Redis (chamado no lifespan)."""
+    global _sem_factory
+    _sem_factory = factory
 
 
 def init_ml_http_client() -> httpx.AsyncClient:
@@ -76,11 +85,12 @@ async def _ml_api_call(
         account_id: ID da conta para rate limiting.
         **kwargs: Argumentos adicionais para httpx (json, params, headers, timeout).
     """
+    from projects.agent.resilience.circuit_breaker import get_registry, CircuitOpenError
+
     timeout = kwargs.pop("timeout", agent_settings.ml_api_timeout)
     headers = kwargs.pop("headers", {}) or {}
     headers = {"X-Agent-Version": agent_settings.agent_version, **headers}
 
-    sem = _ml_api_semaphores[account_id or "global"]
     client = _ml_http_client
 
     if client is None:
@@ -89,9 +99,38 @@ async def _ml_api_call(
             "ML HTTP client nao inicializado. Verifique o lifespan da app.",
         )
 
-    async with sem:
-        start = time.monotonic()
-        try:
+    # Semaphore distribuído (Redis) ou fallback in-memory
+    if _sem_factory is not None:
+        redis_sem = _sem_factory.semaphore(
+            f"ml_api:{account_id or 'global'}",
+            max_concurrent=5,
+            ttl=120,
+        )
+        acquired = await redis_sem.acquire()
+        if not acquired:
+            return tool_error("UNAVAILABLE", "Limite de chamadas ML API atingido.", retryable=True)
+    else:
+        redis_sem = None
+        await _ml_api_semaphores[account_id or "global"].acquire()
+
+    cb = get_registry().get("ml_api")
+
+    # Verifica circuit breaker antes de tentar
+    if cb.is_open:
+        if redis_sem:
+            await redis_sem.release()
+        else:
+            _ml_api_semaphores[account_id or "global"].release()
+        return tool_error(
+            "UNAVAILABLE",
+            f"ML API temporariamente indisponivel (circuit breaker aberto). "
+            f"Tente novamente em {cb.retry_after():.0f}s.",
+            retryable=False,
+        )
+
+    start = time.monotonic()
+    try:
+        async def _do_request():
             resp = await getattr(client, method)(
                 path,
                 timeout=float(timeout),
@@ -99,43 +138,49 @@ async def _ml_api_call(
                 **kwargs,
             )
             resp.raise_for_status()
-            ml_api_latency.labels(
-                method=method, path=path, status=str(resp.status_code),
-            ).observe(time.monotonic() - start)
-            return tool_success(resp.json())
-        except httpx.TimeoutException:
-            ml_api_latency.labels(
-                method=method, path=path, status="timeout",
-            ).observe(time.monotonic() - start)
-            tool_errors_total.labels(
-                tool_name="ml_api_call", error_code="TIMEOUT",
-            ).inc()
-            return tool_error(
-                "TIMEOUT",
-                f"ML API timeout em {path}. Tente novamente em instantes.",
-                retryable=True,
-            )
-        except httpx.HTTPStatusError as e:
-            ml_api_latency.labels(
-                method=method, path=path, status=str(e.response.status_code),
-            ).observe(time.monotonic() - start)
-            tool_errors_total.labels(
-                tool_name="ml_api_call", error_code="HTTP_ERROR",
-            ).inc()
-            return tool_error(
-                "HTTP_ERROR",
-                f"ML API retornou {e.response.status_code} em {path}.",
-                retryable=e.response.status_code >= 500,
-            )
-        except httpx.ConnectError:
-            ml_api_latency.labels(
-                method=method, path=path, status="connect_error",
-            ).observe(time.monotonic() - start)
-            tool_errors_total.labels(
-                tool_name="ml_api_call", error_code="UNAVAILABLE",
-            ).inc()
-            return tool_error(
-                "UNAVAILABLE",
-                "ML API indisponivel. Verifique se o servico esta rodando.",
-                retryable=True,
-            )
+            return resp
+
+        resp = await cb.call(_do_request)
+        ml_api_latency.labels(
+            method=method, path=path, status=str(resp.status_code),
+        ).observe(time.monotonic() - start)
+        return tool_success(resp.json())
+
+    except CircuitOpenError as e:
+        return tool_error("UNAVAILABLE", str(e), retryable=False)
+    except httpx.TimeoutException:
+        ml_api_latency.labels(method=method, path=path, status="timeout").observe(
+            time.monotonic() - start
+        )
+        tool_errors_total.labels(tool_name="ml_api_call", error_code="TIMEOUT").inc()
+        return tool_error(
+            "TIMEOUT",
+            f"ML API timeout em {path}. Tente novamente em instantes.",
+            retryable=True,
+        )
+    except httpx.HTTPStatusError as e:
+        ml_api_latency.labels(
+            method=method, path=path, status=str(e.response.status_code),
+        ).observe(time.monotonic() - start)
+        tool_errors_total.labels(tool_name="ml_api_call", error_code="HTTP_ERROR").inc()
+        return tool_error(
+            "HTTP_ERROR",
+            f"ML API retornou {e.response.status_code} em {path}.",
+            retryable=e.response.status_code >= 500,
+        )
+    except httpx.ConnectError:
+        ml_api_latency.labels(
+            method=method, path=path, status="connect_error",
+        ).observe(time.monotonic() - start)
+        tool_errors_total.labels(tool_name="ml_api_call", error_code="UNAVAILABLE").inc()
+        return tool_error(
+            "UNAVAILABLE",
+            "ML API indisponivel. Verifique se o servico esta rodando.",
+            retryable=True,
+        )
+    finally:
+        # Libera semaphore independente do resultado
+        if redis_sem:
+            await redis_sem.release()
+        else:
+            _ml_api_semaphores[account_id or "global"].release()

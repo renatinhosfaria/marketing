@@ -29,6 +29,9 @@ class AgentSettings(BaseSettings):
     ml_api_url: str = "http://marketing-api:8000"
     ml_api_timeout: int = 30
 
+    # Redis para coordenação distribuída (semaphores, sessões SSE)
+    agent_redis_url: str = "redis://marketing-redis:6379/1"
+
     # Memory (Store)
     store_embedding_model: str = "openai:text-embedding-3-small"
     store_embedding_dims: int = 1536

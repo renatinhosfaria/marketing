@@ -94,3 +94,46 @@ approval_token_failures = Counter(
     "Token de aprovacao invalido",
     ["action_type"],
 )
+
+# --- Metricas de SLO (semana 1 — confiabilidade operacional) ---
+
+# Erros de stream SSE (taxa via rate(agent_stream_errors_total[5m]) no Grafana)
+stream_errors_total = Counter(
+    "agent_stream_errors_total",
+    "Total de erros em streams SSE",
+    ["error_type"],  # graph_error, timeout, cancelled
+)
+
+# Reconexoes SSE (suporte a replay — semana 2)
+stream_reconnect_total = Counter(
+    "agent_stream_reconnect_total",
+    "Total de tentativas de reconexao SSE",
+    ["status"],  # attempted, success, session_not_found
+)
+
+# Latencia ate o primeiro evento SSE (TTFB do stream)
+stream_first_event_latency = Histogram(
+    "agent_first_event_latency_seconds",
+    "Latencia do primeiro evento SSE (time-to-first-byte)",
+    buckets=[0.1, 0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 8.0],
+)
+
+# Tempo total do stream ate evento done
+stream_time_to_done = Histogram(
+    "agent_time_to_done_seconds",
+    "Tempo total do stream SSE ate evento done",
+    buckets=[1, 2, 5, 10, 20, 30, 60, 120],
+)
+
+# Sessoes SSE orfas detectadas pelo reaper periodico
+session_orphan_count = Gauge(
+    "agent_session_orphan_count",
+    "Sessoes SSE orfas detectadas",
+)
+
+# Circuit breakers abertos por dependencia (0=fechado, 1=aberto)
+dependency_circuit_open = Gauge(
+    "agent_dependency_circuit_open_total",
+    "Circuit breakers abertos por dependencia",
+    ["dependency"],  # ml_api, fb_api, store
+)
