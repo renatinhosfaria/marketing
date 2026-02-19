@@ -3,11 +3,15 @@ Tasks Celery para limpeza de dados do Agent.
 
 cleanup_agent_checkpoints: remove checkpoints mais antigos que 30 dias.
 cleanup_agent_store: remove memorias expiradas por namespace.
+reap_orphan_sse_sessions: conta sessoes SSE ativas no Redis e atualiza metrica.
 
 Agendamento via Celery Beat:
   - cleanup_agent_checkpoints: todo domingo as 03:00 AM
   - cleanup_agent_store: primeiro domingo do mes as 04:00 AM
+  - reap_orphan_sse_sessions: a cada 5 minutos
 """
+
+import redis as sync_redis
 
 from sqlalchemy import text
 
@@ -18,6 +22,9 @@ from projects.agent.config import agent_settings
 import structlog
 
 logger = structlog.get_logger()
+
+# Prefixo das meta-keys de sessao SSE no Redis
+_SESSION_META_PATTERN = "agent:sse:meta:*"
 
 # Nomes de tabelas do LangGraph (validar antes de executar DELETE):
 # - AsyncPostgresSaver: "checkpoints", "checkpoint_blobs", "checkpoint_writes"
@@ -111,3 +118,41 @@ def cleanup_agent_store():
         "deleted_insights": deleted_insights,
         "deleted_actions": deleted_actions,
     }
+
+
+@celery_app.task(queue="default")
+def reap_orphan_sse_sessions():
+    """Conta sessoes SSE ativas no Redis e atualiza metrica Prometheus.
+
+    Uma sessao "ativa" (status=active ou meta-key ainda presente) que nao foi
+    encerrada explicitamente e considerada orfã — cliente desconectou antes
+    do close_session() ser chamado. O TTL do Redis as remove automaticamente,
+    mas o gauge session_orphan_count permite monitorar a taxa.
+
+    Agendado: a cada 5 minutos via Celery Beat.
+    """
+    logger.info("agent.reap_orphan_sse_sessions.start")
+    if not agent_settings.enable_agent_jobs:
+        logger.info("agent.reap_orphan_sse_sessions.skipped", reason="AGENT_ENABLE_AGENT_JOBS=false")
+        return {"skipped": True}
+
+    try:
+        r = sync_redis.from_url(
+            agent_settings.agent_redis_url,
+            decode_responses=True,
+            socket_connect_timeout=5,
+        )
+
+        # Conta todas as meta-keys presentes (cada uma = sessao ativa ou recentemente encerrada)
+        count = sum(1 for _ in r.scan_iter(_SESSION_META_PATTERN, count=100))
+        r.close()
+
+        from projects.agent.observability.metrics import session_orphan_count
+        session_orphan_count.set(count)
+
+        logger.info("agent.reap_orphan_sse_sessions.done", active_sessions=count)
+        return {"active_sessions": count}
+
+    except Exception as exc:
+        logger.warning("agent.reap_orphan_sse_sessions.failed", error=str(exc))
+        return {"error": str(exc)}

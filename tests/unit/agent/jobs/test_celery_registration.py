@@ -17,3 +17,4 @@ def test_agent_jobs_present_in_beat_schedule():
     assert "projects.agent.jobs.impact.calculate_action_impact" in task_names
     assert "projects.agent.jobs.retention.cleanup_agent_checkpoints" in task_names
     assert "projects.agent.jobs.retention.cleanup_agent_store" in task_names
+    assert "projects.agent.jobs.retention.reap_orphan_sse_sessions" in task_names

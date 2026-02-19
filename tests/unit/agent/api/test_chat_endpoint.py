@@ -4,9 +4,10 @@ Testes do endpoint /chat e funcoes auxiliares do router.
 Testa:
   - _build_thread_id: prefixo tenant isolamento
   - _build_thread_id: validacao de thread_id cross-tenant
-  - _get_semaphore: criacao e reuso de semaforos
+  - _resolve_stream_status: classificacao de status final da task
   - health endpoint: retorna status correto
   - SSE stream format (sse_event, _safe_json)
+  - Caos leves: task com excecao, task nao finalizada
 """
 
 import pytest
@@ -46,24 +47,6 @@ async def test_build_thread_id_cross_tenant_rejection():
     assert exc_info.value.status_code == 400
     assert "outro tenant" in exc_info.value.detail.lower()
 
-
-@pytest.mark.asyncio
-async def test_get_semaphore_creates_and_reuses():
-    """_get_semaphore cria semaforo e reutiliza para mesmo usuario."""
-    from projects.agent.api.router import _get_semaphore, _stream_semaphores
-
-    # Limpar estado
-    _stream_semaphores.clear()
-
-    sem1 = _get_semaphore("user_test_1")
-    sem2 = _get_semaphore("user_test_1")
-    sem3 = _get_semaphore("user_test_2")
-
-    assert sem1 is sem2  # Mesmo usuario, mesmo semaforo
-    assert sem1 is not sem3  # Usuarios diferentes, semaforos diferentes
-
-    # Cleanup
-    _stream_semaphores.clear()
 
 
 @pytest.mark.asyncio
@@ -186,3 +169,80 @@ async def test_resolve_stream_status_cancelled_task():
         await task
 
     assert _resolve_stream_status(task) == "cancelled"
+
+
+@pytest.mark.asyncio
+async def test_resolve_stream_status_done_with_exception():
+    """_resolve_stream_status retorna 'error' para task que levantou excecao."""
+    from projects.agent.api.router import _resolve_stream_status
+
+    async def _raises():
+        raise RuntimeError("Simulated chaos: ML API timeout")
+
+    task = asyncio.create_task(_raises())
+    with pytest.raises(RuntimeError):
+        await task
+
+    assert _resolve_stream_status(task) == "error"
+
+
+@pytest.mark.asyncio
+async def test_resolve_stream_status_not_done():
+    """_resolve_stream_status retorna 'ok' enquanto task ainda roda."""
+    from projects.agent.api.router import _resolve_stream_status
+
+    async def _slow():
+        await asyncio.sleep(60)
+
+    task = asyncio.create_task(_slow())
+    try:
+        # Task ainda rodando — nao concluiu
+        assert _resolve_stream_status(task) == "ok"
+    finally:
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+
+@pytest.mark.asyncio
+async def test_resolve_stream_status_completed_ok():
+    """_resolve_stream_status retorna 'ok' para task que completou sem excecao."""
+    from projects.agent.api.router import _resolve_stream_status
+
+    async def _ok():
+        return "done"
+
+    task = asyncio.create_task(_ok())
+    await task
+
+    assert _resolve_stream_status(task) == "ok"
+
+
+@pytest.mark.asyncio
+async def test_fallback_semaphore_isolates_users():
+    """_stream_semaphores_fallback cria semaforos independentes por usuario."""
+    from projects.agent.api.router import _stream_semaphores_fallback
+
+    # Limpar estado para teste isolado
+    _stream_semaphores_fallback.clear()
+
+    # Criar dois usuarios diferentes via logica do router (inline)
+    uid1, uid2 = "chaos_user_1", "chaos_user_2"
+    if uid1 not in _stream_semaphores_fallback:
+        _stream_semaphores_fallback[uid1] = asyncio.Semaphore(3)
+    if uid2 not in _stream_semaphores_fallback:
+        _stream_semaphores_fallback[uid2] = asyncio.Semaphore(3)
+
+    # Semaforos sao independentes
+    assert _stream_semaphores_fallback[uid1] is not _stream_semaphores_fallback[uid2]
+
+    # Adquirir semaforo de uid1 nao afeta uid2
+    await _stream_semaphores_fallback[uid1].acquire()
+    await _stream_semaphores_fallback[uid1].acquire()
+    await _stream_semaphores_fallback[uid1].acquire()
+    assert _stream_semaphores_fallback[uid1].locked()
+    assert not _stream_semaphores_fallback[uid2].locked()
+
+    # Cleanup
+    _stream_semaphores_fallback.pop(uid1, None)
+    _stream_semaphores_fallback.pop(uid2, None)

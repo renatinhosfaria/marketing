@@ -247,6 +247,13 @@ celery_app.conf.update(
             "schedule": crontab(day_of_week=0, day_of_month="1-7", hour=4, minute=0),
             "options": {"queue": "default"},
         },
+
+        # Agent - Reaper de sessoes SSE orfas a cada 5 minutos
+        "agent-sse-session-reaper": {
+            "task": "projects.agent.jobs.retention.reap_orphan_sse_sessions",
+            "schedule": crontab(minute="*/5"),
+            "options": {"queue": "default"},
+        },
     },
 
     # Filas
