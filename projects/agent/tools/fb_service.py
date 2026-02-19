@@ -10,6 +10,10 @@ Convencao de valores monetarios:
     ao importar da Graph API.
   - Graph API (daily_budget): espera CENTAVOS (int). Ex: R$50.00 = 5000.
   - Este modulo: recebe em REAIS, converte para CENTAVOS antes de enviar.
+
+Circuit breaker: chamadas de escrita (update_budget, update_status) usam o CB
+"fb_api" do CircuitBreakerRegistry. Quando aberto, lanca CircuitOpenError em vez
+de tentar 5x e falhar no timeout.
 """
 
 import structlog
@@ -21,6 +25,12 @@ from projects.facebook_ads.client.base import FacebookGraphClient
 from projects.facebook_ads.security.token_encryption import decrypt_token
 
 logger = structlog.get_logger()
+
+
+def _get_fb_cb():
+    """Retorna circuit breaker para FB API (lazy import evita ciclo)."""
+    from projects.agent.resilience.circuit_breaker import get_registry
+    return get_registry().get("fb_api")
 
 
 async def get_campaign(campaign_id: str):
@@ -120,18 +130,24 @@ async def update_budget(campaign_id: str, new_daily_budget: float):
     """Atualiza budget via Facebook Graph API.
 
     Converte reais para centavos (Facebook espera centavos).
+    Usa circuit breaker "fb_api" — lanca CircuitOpenError quando aberto.
 
     Args:
         campaign_id: ID da campanha no Facebook.
         new_daily_budget: Novo budget diario em reais.
     """
+    cb = _get_fb_cb()
     client, _ = await _get_graph_client(campaign_id)
     try:
         centavos = round(new_daily_budget * 100)
-        await client.post(
-            endpoint=campaign_id,
-            data={"daily_budget": centavos},
-        )
+
+        async def _do():
+            await client.post(
+                endpoint=campaign_id,
+                data={"daily_budget": centavos},
+            )
+
+        await cb.call(_do)
         logger.info(
             "Budget atualizado via Graph API",
             campaign_id=campaign_id,
@@ -148,6 +164,8 @@ _ALLOWED_STATUSES = {"ACTIVE", "PAUSED"}
 async def update_status(campaign_id: str, new_status: str):
     """Atualiza status (ACTIVE/PAUSED) via Facebook Graph API.
 
+    Usa circuit breaker "fb_api" — lanca CircuitOpenError quando aberto.
+
     Args:
         campaign_id: ID da campanha no Facebook.
         new_status: Novo status ("ACTIVE" ou "PAUSED").
@@ -159,12 +177,16 @@ async def update_status(campaign_id: str, new_status: str):
         raise ValueError(
             f"Status invalido: {new_status}. Permitidos: {_ALLOWED_STATUSES}"
         )
+    cb = _get_fb_cb()
     client, _ = await _get_graph_client(campaign_id)
     try:
-        await client.post(
-            endpoint=campaign_id,
-            data={"status": new_status},
-        )
+        async def _do():
+            await client.post(
+                endpoint=campaign_id,
+                data={"status": new_status},
+            )
+
+        await cb.call(_do)
         logger.info(
             "Status atualizado via Graph API",
             campaign_id=campaign_id,

@@ -213,3 +213,123 @@ async def test_build_synthesis_prompt_format():
     assert "forecast_scientist" in prompt
     assert "falha" in prompt.lower() or "problemas" in prompt.lower()
     assert "portugues" in prompt.lower()
+
+
+@pytest.mark.asyncio
+async def test_synthesizer_fallback_when_llm_fails():
+    """Quando o LLM de sintese falha, retorna sintese textual dos reports sem LLM."""
+    mock_model = AsyncMock()
+    mock_model.ainvoke.side_effect = RuntimeError("LLM unavailable")
+    mock_store = AsyncMock()
+
+    state = {
+        "messages": [HumanMessage(content="Como estao as campanhas?")],
+        "agent_reports": [
+            {
+                "agent_id": "performance_analyst",
+                "status": "completed",
+                "summary": "CPL em R$25, CTR 2.1%.",
+                "data": {},
+                "confidence": 0.85,
+            },
+            {
+                "agent_id": "health_monitor",
+                "status": "error",
+                "summary": "Falha no subgraph",
+                "data": None,
+                "confidence": 0.0,
+            },
+        ],
+        "user_context": {"user_id": "u1", "account_id": "a1", "account_name": "", "timezone": "America/Sao_Paulo"},
+        "routing_decision": None,
+        "pending_actions": [],
+        "synthesis": None,
+        "remaining_steps": 100,
+    }
+    config = {"configurable": {"thread_id": "t1", "user_id": "u1", "account_id": "a1"}}
+
+    with patch("projects.agent.graph.synthesizer.get_model", return_value=mock_model), \
+         patch("projects.agent.graph.synthesizer._maybe_generate_title", new_callable=AsyncMock):
+        from projects.agent.graph.synthesizer import synthesizer_node
+        result = await synthesizer_node(state, config, store=mock_store)
+
+    # Deve retornar resposta mesmo com LLM indisponivel
+    assert "messages" in result
+    assert "synthesis" in result
+    msg = result["messages"][0]
+    assert isinstance(msg, AIMessage)
+    # O fallback deve incluir o summary do agente bem-sucedido
+    assert "CPL" in msg.content or "performance" in msg.content.lower()
+
+
+@pytest.mark.asyncio
+async def test_synthesizer_fallback_all_failed():
+    """Fallback sem nenhum agente bem-sucedido retorna mensagem de erro clara."""
+    mock_model = AsyncMock()
+    mock_model.ainvoke.side_effect = RuntimeError("LLM unavailable")
+    mock_store = AsyncMock()
+
+    state = {
+        "messages": [HumanMessage(content="Analise")],
+        "agent_reports": [
+            {
+                "agent_id": "health_monitor",
+                "status": "error",
+                "summary": "Falha",
+                "data": None,
+                "confidence": 0.0,
+            },
+        ],
+        "user_context": {"user_id": "u1", "account_id": "a1", "account_name": "", "timezone": "America/Sao_Paulo"},
+        "routing_decision": None,
+        "pending_actions": [],
+        "synthesis": None,
+        "remaining_steps": 100,
+    }
+    config = {"configurable": {"thread_id": "t1", "user_id": "u1", "account_id": "a1"}}
+
+    with patch("projects.agent.graph.synthesizer.get_model", return_value=mock_model), \
+         patch("projects.agent.graph.synthesizer._maybe_generate_title", new_callable=AsyncMock):
+        from projects.agent.graph.synthesizer import synthesizer_node
+        result = await synthesizer_node(state, config, store=mock_store)
+
+    msg = result["messages"][0]
+    assert isinstance(msg, AIMessage)
+    # Deve mencionar que nao foi possivel obter dados
+    assert len(msg.content) > 0
+
+
+def test_build_plain_synthesis_with_successful():
+    """_build_plain_synthesis formata summaries corretamente."""
+    from projects.agent.graph.synthesizer import _build_plain_synthesis
+
+    successful = [
+        {"agent_id": "performance_analyst", "summary": "CPL em R$25.", "status": "completed", "confidence": 0.9, "data": {}},
+    ]
+    failed = [
+        {"agent_id": "health_monitor", "summary": "Falha", "status": "error", "confidence": 0.0, "data": None},
+    ]
+
+    text = _build_plain_synthesis(successful, failed)
+
+    assert "CPL em R$25" in text
+    assert "health_monitor" in text
+    assert "1 agente(s)" in text
+
+
+def test_build_plain_synthesis_all_failed():
+    """_build_plain_synthesis sem agentes bem-sucedidos retorna mensagem clara."""
+    from projects.agent.graph.synthesizer import _build_plain_synthesis
+
+    text = _build_plain_synthesis([], [{"agent_id": "x", "summary": "?", "status": "error", "confidence": 0.0, "data": None}])
+
+    assert "x" in text
+    assert len(text) > 0
+
+
+def test_build_plain_synthesis_empty():
+    """_build_plain_synthesis sem reports retorna mensagem de fallback."""
+    from projects.agent.graph.synthesizer import _build_plain_synthesis
+
+    text = _build_plain_synthesis([], [])
+    assert "nao foi possivel" in text.lower() or "nao consegui" in text.lower()

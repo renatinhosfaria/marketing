@@ -24,7 +24,12 @@ async def synthesizer_node(
     *,
     store: BaseStore,
 ):
-    """Sintetiza reports dos agentes em resposta final."""
+    """Sintetiza reports dos agentes em resposta final.
+
+    Garante sintese parcial mesmo quando:
+    - Alguns agentes falharam (usa reports bem-sucedidos)
+    - O LLM de sintese falha (retorna resumo textual dos reports sem LLM)
+    """
     reports = state.get("agent_reports", [])
 
     # Se nenhum agente respondeu, resposta de fallback
@@ -41,16 +46,28 @@ async def synthesizer_node(
     user_question = state["messages"][-1].content if state["messages"] else ""
     prompt = _build_synthesis_prompt(successful, failed, user_question)
 
-    model = get_model("synthesizer", config)
-    response = await model.ainvoke([
-        SystemMessage(content=prompt),
-        HumanMessage(content=user_question),
-    ])
+    try:
+        model = get_model("synthesizer", config)
+        response = await model.ainvoke([
+            SystemMessage(content=prompt),
+            HumanMessage(content=user_question),
+        ])
+        synthesis_text = response.content
+    except Exception as e:
+        # LLM indisponivel: montar sintese textual a partir dos reports sem LLM
+        logger.warning(
+            "synthesizer.llm_failed",
+            error=str(e),
+            successful_agents=len(successful),
+            failed_agents=len(failed),
+        )
+        synthesis_text = _build_plain_synthesis(successful, failed)
+        response = AIMessage(content=synthesis_text)
 
-    # Gerar titulo na primeira interacao
+    # Gerar titulo na primeira interacao (best-effort — nao bloqueia resposta)
     await _maybe_generate_title(state, config, store, user_question)
 
-    return {"messages": [response], "synthesis": response.content}
+    return {"messages": [response], "synthesis": synthesis_text}
 
 
 async def _maybe_generate_title(
@@ -127,5 +144,36 @@ def _build_synthesis_prompt(
         "\nResponda em portugues (Brasil), de forma clara e acionavel. "
         "Use formatacao markdown quando apropriado."
     )
+
+    return "\n".join(parts)
+
+
+def _build_plain_synthesis(successful: list, failed: list) -> str:
+    """Sintese textual sem LLM: usado como fallback quando o modelo nao responde.
+
+    Formata os summaries dos agentes bem-sucedidos como lista estruturada.
+    Inclui aviso sobre agentes com falha.
+    """
+    parts = []
+
+    if successful:
+        parts.append("**Analise parcial dos agentes disponíveis:**\n")
+        for r in successful:
+            agent_label = r.get("agent_id", "agente").replace("_", " ").title()
+            summary = (r.get("summary") or "Sem dados disponiveis.").strip()
+            parts.append(f"**{agent_label}:** {summary}\n")
+
+    if failed:
+        agents_str = ", ".join(r.get("agent_id", "?") for r in failed)
+        parts.append(
+            f"\n*Nota: {len(failed)} agente(s) nao responderam nesta execucao "
+            f"({agents_str}). Os dados acima refletem apenas as analises disponiveis.*"
+        )
+
+    if not parts:
+        return (
+            "Nao foi possivel obter analises neste momento. "
+            "Por favor, tente novamente em instantes."
+        )
 
     return "\n".join(parts)

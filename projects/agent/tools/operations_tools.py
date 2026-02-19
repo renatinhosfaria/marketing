@@ -484,6 +484,7 @@ async def execute_budget_change(
     try:
         await fb_service.update_budget(campaign_id, new_daily_budget)
     except Exception as e:
+        from projects.agent.resilience.circuit_breaker import CircuitOpenError
         await _mark_action_log_status(
             idempotency_key=idempotency_key,
             status="failed",
@@ -493,6 +494,13 @@ async def execute_budget_change(
                 "error": str(e),
             },
         )
+        if isinstance(e, CircuitOpenError):
+            return tool_error(
+                "UNAVAILABLE",
+                f"Facebook API temporariamente indisponivel. "
+                f"Tente novamente em {e.retry_after:.0f}s.",
+                retryable=False,
+            )
         return tool_error(
             "FB_API_ERROR",
             f"Erro ao atualizar orcamento via Facebook API: {e}",
@@ -618,6 +626,7 @@ async def execute_status_change(
     try:
         await fb_service.update_status(campaign_id, new_status)
     except Exception as e:
+        from projects.agent.resilience.circuit_breaker import CircuitOpenError
         await _mark_action_log_status(
             idempotency_key=idempotency_key,
             status="failed",
@@ -627,6 +636,13 @@ async def execute_status_change(
                 "error": str(e),
             },
         )
+        if isinstance(e, CircuitOpenError):
+            return tool_error(
+                "UNAVAILABLE",
+                f"Facebook API temporariamente indisponivel. "
+                f"Tente novamente em {e.retry_after:.0f}s.",
+                retryable=False,
+            )
         return tool_error(
             "FB_API_ERROR",
             f"Erro ao atualizar status via Facebook API: {e}",
