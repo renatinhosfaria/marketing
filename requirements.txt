@@ -78,13 +78,3 @@ pytest-asyncio==0.23.3
 pytest-cov==4.1.0
 httpx==0.26.0
 
-# ==================== LangGraph + LangChain (Agent Ecosystem) ====================
-langgraph>=0.2.60
-langgraph-checkpoint-postgres>=2.0.0
-psycopg[binary]>=3.1.0
-langchain>=0.3.0
-langchain-core>=0.3.0
-langchain-anthropic>=0.3.0
-langchain-openai>=0.3.0
-pgvector>=0.3.0
-cachetools>=5.3.0

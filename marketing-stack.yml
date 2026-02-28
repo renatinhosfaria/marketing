@@ -27,7 +27,6 @@ services:
       - NODE_ENV=production
       - API_INTERNAL_URL=http://marketing-api:8000
       - FB_ADS_INTERNAL_URL=http://marketing-fb-ads:8002
-      - AGENT_INTERNAL_URL=http://marketing-agent:8001
     deploy:
       mode: replicated
       replicas: 1
@@ -170,63 +169,6 @@ services:
       - network_public
       - marketing-internal
 
-  # ==================== Agent API (Multi-Agent Ecosystem) ====================
-  marketing-agent:
-    image: marketing:latest
-    command: ["uvicorn", "app.agent_main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "1", "--loop", "uvloop"]
-    environment:
-      - DATABASE_URL=postgresql://postgres:IwOLgVnyOfbN@postgres:5432/marketing?sslmode=disable
-      - REDIS_URL=redis://marketing-redis:6379/1
-      - AGENT_ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - AGENT_OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - AGENT_ML_API_URL=http://marketing-api:8000
-      - AGENT_REQUIRE_AUTH=false
-      - AGENT_APPROVAL_TOKEN_SECRET=${AGENT_APPROVAL_TOKEN_SECRET:-change-me}
-      - AGENT_ENABLE_STRICT_WRITE_PATH=${AGENT_ENABLE_STRICT_WRITE_PATH:-true}
-      - AGENT_ENABLE_ML_ENDPOINT_FIXES=${AGENT_ENABLE_ML_ENDPOINT_FIXES:-true}
-      - AGENT_ENABLE_AGENT_JOBS=${AGENT_ENABLE_AGENT_JOBS:-true}
-      - LANGSMITH_TRACING=${LANGSMITH_TRACING:-false}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-      - ENVIRONMENT=${ENVIRONMENT:-production}
-    deploy:
-      mode: replicated
-      replicas: 1
-      placement:
-        constraints:
-          - node.role == manager
-      restart_policy:
-        condition: any
-        delay: 5s
-      resources:
-        limits:
-          cpus: '1'
-          memory: 1G
-        reservations:
-          cpus: '0.25'
-          memory: 256M
-      labels:
-        - "traefik.enable=true"
-        - "traefik.docker.network=network_public"
-        # Rota /api/v1/agent (prioridade ALTA - antes de /api/ genérico)
-        - "traefik.http.routers.marketing_agent.rule=Host(`marketing.famachat.com.br`) && PathPrefix(`/api/v1/agent`)"
-        - "traefik.http.routers.marketing_agent.entrypoints=websecure"
-        - "traefik.http.routers.marketing_agent.priority=10"
-        - "traefik.http.routers.marketing_agent.tls=true"
-        - "traefik.http.routers.marketing_agent.tls.certresolver=letsencryptresolver"
-        - "traefik.http.routers.marketing_agent.service=marketing_marketing-agent"
-        - "traefik.http.services.marketing_marketing-agent.loadbalancer.server.port=8001"
-        - "traefik.http.services.marketing_marketing-agent.loadbalancer.passHostHeader=true"
-        # SSE: desabilitar buffering para streaming
-        - "traefik.http.services.marketing_marketing-agent.loadbalancer.responseForwarding.flushInterval=1ms"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/api/v1/agent/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    networks:
-      - network_public
-      - marketing-internal
 
   # ==================== Celery Worker ML (filas: training, ml) ====================
   marketing-worker:

@@ -1,10 +1,10 @@
 {
   "config_id": 14,
-  "last_training": "2026-02-19T07:00:23.074901",
+  "last_training": "2026-02-28T07:00:20.051103",
   "models_count": {
     "campaign": 9,
     "adset": 27,
-    "ad": 9
+    "ad": 8
   },
-  "training_duration_seconds": 22.385542
+  "training_duration_seconds": 19.794791
 }

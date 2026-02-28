@@ -4,5 +4,5 @@
     "seasonality_prior_scale": 1.0
   },
   "metric": "leads",
-  "tuned_at": "2026-02-15T05:30:43.279511"
+  "tuned_at": "2026-02-22T05:30:44.832789"
 }

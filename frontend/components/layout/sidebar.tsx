@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/tooltip";
 import {
   BarChart3,
-  Bot,
   Brain,
   Menu,
   X,
@@ -28,7 +27,6 @@ const STORAGE_KEY = "sidebar-collapsed";
 const navItems = [
   { href: "/app/facebook-ads", label: "Facebook Ads", icon: BarChart3 },
   { href: "/app/ml", label: "ML Analytics", icon: Brain },
-  { href: "/app/ai-agent", label: "Agente IA", icon: Bot },
 ];
 
 export function Sidebar() {

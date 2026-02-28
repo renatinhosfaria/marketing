@@ -6,7 +6,6 @@ const pageTitles: Record<string, string> = {
   "/app/facebook-ads": "Facebook Ads",
   "/app/facebook-ads/settings": "Configurações Facebook Ads",
   "/app/ml": "ML Analytics",
-  "/app/ai-agent": "Agente IA",
 };
 
 export function Header() {
