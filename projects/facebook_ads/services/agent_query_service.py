@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from projects.facebook_ads.services.agent_prompt_to_sql import PromptToSQL
 from projects.facebook_ads.services.agent_sql_guard import SQLGuard
 
 
@@ -15,11 +16,17 @@ class AgentQueryService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def execute_sql(self, prompt: str, sql: str, requested_by: str = "fbads") -> dict[str, Any]:
-        validation = SQLGuard.validate(sql)
+    async def execute_sql(
+        self,
+        prompt: str,
+        sql: str | None,
+        requested_by: str = "fbads",
+    ) -> dict[str, Any]:
+        resolved_sql = sql.strip() if sql else PromptToSQL.translate(prompt)
+        validation = SQLGuard.validate(resolved_sql)
 
         started_at = datetime.utcnow()
-        result = await self.db.execute(text(sql))
+        result = await self.db.execute(text(resolved_sql))
 
         rows: list[dict[str, Any]] = []
         if validation.operation_type == "SELECT":
@@ -60,7 +67,7 @@ class AgentQueryService:
             {
                 "requested_by": requested_by,
                 "prompt": prompt,
-                "generated_sql": sql,
+                "generated_sql": resolved_sql,
                 "operation_type": validation.operation_type,
                 "rows_affected": rows_affected,
                 "duration_ms": duration_ms,
@@ -69,7 +76,7 @@ class AgentQueryService:
 
         return {
             "operationType": validation.operation_type,
-            "sqlExecuted": sql,
+            "sqlExecuted": resolved_sql,
             "rowsAffected": rows_affected,
             "rows": rows,
             "durationMs": duration_ms,

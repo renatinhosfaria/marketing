@@ -16,9 +16,6 @@ async def run_agent_query(
     db: AsyncSession = Depends(get_db),
 ):
     """Executa query do agente com guardrails e auditoria."""
-    if not request.sql:
-        raise HTTPException(status_code=400, detail="SQL nao fornecido")
-
     service = AgentQueryService(db)
     try:
         result = await service.execute_sql(prompt=request.prompt, sql=request.sql)

@@ -42,6 +42,22 @@ async def test_service_executes_select_and_audits() -> None:
 
 
 @pytest.mark.asyncio
+async def test_service_uses_prompt_translation_when_sql_missing() -> None:
+    db = _FakeSession()
+    db.execute.side_effect = [
+        _FakeResult(rows=[_FakeRow({"campaign_id": "321", "spend": 250.0})], rowcount=1),
+        _FakeResult(rowcount=1),
+    ]
+
+    service = AgentQueryService(db)
+    result = await service.execute_sql(prompt="listar top 5 campanhas por spend da config 1", sql=None)
+
+    assert result["operationType"] == "SELECT"
+    assert "sistema_facebook_ads_insights_history" in result["sqlExecuted"]
+    assert db.execute.await_count == 2
+
+
+@pytest.mark.asyncio
 async def test_service_blocks_unsafe_sql() -> None:
     db = _FakeSession()
     service = AgentQueryService(db)
