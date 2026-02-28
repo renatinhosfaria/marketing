@@ -17,7 +17,7 @@ def test_build_hard_delete_statements_includes_tables_in_order():
 
     assert _table_names(statements) == [
         "ml_predictions",
-        "ml_campaign_classifications",
+        "ml_classifications",
         "ml_recommendations",
         "ml_anomalies",
         "ml_features",
@@ -66,7 +66,7 @@ class _FakeSession:
     def __init__(self):
         self.executed = []
 
-    async def execute(self, stmt):
+    async def execute(self, stmt, params=None):
         self.executed.append(stmt)
         if stmt.__class__.__name__ == "TextClause":
             return _FakeResult(["table_exists"])
@@ -80,7 +80,7 @@ class _EndpointSession:
         self.committed = False
         self._select_calls = 0
 
-    async def execute(self, stmt):
+    async def execute(self, stmt, params=None):
         self.executed.append(stmt)
         if stmt.__class__.__name__ == "Select":
             self._select_calls += 1
@@ -107,7 +107,7 @@ async def test_hard_delete_config_executes_expected_deletes():
 
     assert delete_tables == [
         "ml_predictions",
-        "ml_campaign_classifications",
+        "ml_classifications",
         "ml_recommendations",
         "ml_anomalies",
         "ml_features",
