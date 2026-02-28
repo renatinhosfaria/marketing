@@ -18,13 +18,13 @@ bash scripts/healthcheck.sh
 docker compose ps
 docker compose logs marketing-api --tail=200
 docker compose logs marketing-worker --tail=200
-curl -sf http://localhost:8001/api/v1/facebook-ads/health/simple
+curl -sf http://localhost:8003/api/v1/facebook-ads/health/simple
 ```
 
 Smoke test do Agent Query Tool:
 
 ```bash
-curl -X POST http://localhost:8001/api/v1/facebook-ads/agent/query \
+curl -X POST http://localhost:8003/api/v1/facebook-ads/agent/query \
   -H "Content-Type: application/json" \
   -d '{"prompt":"listar top 5 campanhas por spend da config 1"}'
 ```
@@ -34,7 +34,7 @@ Resposta esperada: `{"success": true, ...}` com `sqlExecuted`, `operationType` e
 Teste de bloqueio destrutivo:
 
 ```bash
-curl -X POST http://localhost:8001/api/v1/facebook-ads/agent/query \
+curl -X POST http://localhost:8003/api/v1/facebook-ads/agent/query \
   -H "Content-Type: application/json" \
   -d '{"prompt":"ajuste manual","sql":"UPDATE sistema_facebook_ads_ads SET status = ''PAUSED''"}'
 ```
