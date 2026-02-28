@@ -28,10 +28,56 @@ Dominios principais:
 - endpoints de campanhas, adsets e ads.
 - `GET /insights/*` para KPIs, series, rankings, comparativos e breakdowns.
 
+### Agent Query Tool
+
+Endpoint:
+
+- `POST /agent/query`
+
+Request JSON:
+
+```json
+{
+  "prompt": "listar top 5 campanhas por spend da config 1",
+  "sql": "SELECT 1",
+  "context": {
+    "dateFrom": "2026-02-01",
+    "dateTo": "2026-02-28"
+  }
+}
+```
+
+Regras:
+
+- `prompt` e obrigatorio.
+- `sql` e opcional; quando ausente, o backend aplica traducao `NL -> SQL`.
+- guardrails bloqueiam operacoes destrutivas: `DROP`, `TRUNCATE`, `DELETE` sem `WHERE`, `UPDATE` sem `WHERE`.
+
+Response (sucesso):
+
+```json
+{
+  "success": true,
+  "data": {
+    "operationType": "SELECT",
+    "sqlExecuted": "SELECT campaign_id, SUM(spend) AS spend FROM ... LIMIT 5",
+    "rowsAffected": 5,
+    "rows": [],
+    "durationMs": 42
+  }
+}
+```
+
+Response (bloqueio):
+
+```json
+{
+  "detail": "UPDATE sem WHERE bloqueado"
+}
+```
+
 ## Autenticacao e seguranca
 
 - APIs protegidas usam `X-API-Key` e, em alguns fluxos, JWT Bearer.
 - Rate limit aplicado por middleware.
 - Segredos devem ser fornecidos via variaveis de ambiente.
-
-- `POST /agent/query` para consultas e operacoes do agente FB Ads (NL -> SQL), com auditoria e bloqueio de operacoes destrutivas.
