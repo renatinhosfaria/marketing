@@ -33,3 +33,5 @@ Dominios principais:
 - APIs protegidas usam `X-API-Key` e, em alguns fluxos, JWT Bearer.
 - Rate limit aplicado por middleware.
 - Segredos devem ser fornecidos via variaveis de ambiente.
+
+- `POST /agent/query` para consultas e operacoes do agente FB Ads (NL -> SQL), com auditoria e bloqueio de operacoes destrutivas.

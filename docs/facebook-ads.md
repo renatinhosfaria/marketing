@@ -33,3 +33,9 @@ Gestao de contas conectadas e metadados operacionais:
 - CRUD de configuracoes por cliente;
 - validacao de conectividade;
 - descoberta de ad accounts associadas.
+
+## Agent Query Tool (placeholder)
+
+Ferramenta para o agente `fbads` executar consultas e operacoes SQL a partir de linguagem natural, com guardrails de seguranca e auditoria.
+
+Status atual: em implementacao.
