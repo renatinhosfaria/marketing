@@ -9,6 +9,7 @@ from projects.facebook_ads.api import (
     sync,
     campaigns,
     insights,
+    agent_query,
 )
 
 # Router público (health checks)
@@ -21,6 +22,7 @@ authenticated_router.include_router(config_endpoints.router, prefix="/config", t
 authenticated_router.include_router(sync.router, prefix="/sync", tags=["Facebook Ads - Sync"])
 authenticated_router.include_router(campaigns.router, tags=["Facebook Ads - Campaigns"])
 authenticated_router.include_router(insights.router, prefix="/insights", tags=["Facebook Ads - Insights"])
+authenticated_router.include_router(agent_query.router, prefix="/agent", tags=["Facebook Ads - Agent"])
 
 # Router principal que combina público + autenticado
 facebook_ads_router = APIRouter()
