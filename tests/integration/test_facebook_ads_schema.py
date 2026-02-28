@@ -14,6 +14,7 @@ REQUIRED_TABLES = [
     "sistema_facebook_ads_sync_history",
     "ml_facebook_ads_management_log",
     "ml_facebook_ads_rate_limit_log",
+    "fbads_agent_query_audit",
 ]
 
 
