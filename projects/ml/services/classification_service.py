@@ -92,7 +92,7 @@ class ClassificationService:
             # Continuar mesmo com dados insuficientes, mas logar o aviso
 
         # Obter métricas de referência
-        avg_metrics = await self.data_service.get_aggregated_metrics(config_id, days=14)
+        avg_metrics = await self.data_service.get_aggregated_metrics(config_id, days=30)
         avg_cpl = avg_metrics.get('avg_cpl', 50.0)
         avg_ctr = avg_metrics.get('avg_ctr', 1.0)
 
@@ -357,7 +357,7 @@ class ClassificationService:
             return None
 
         # Obter métricas de referência
-        avg_metrics = await self.data_service.get_aggregated_metrics(config_id, days=30)
+        avg_metrics = await self.data_service.get_aggregated_metrics(config_id, days=60)
         avg_cpl = avg_metrics.get("avg_cpl", 50.0)
         avg_ctr = avg_metrics.get("avg_ctr", 1.0)
 

@@ -21,7 +21,7 @@ def _serialize_features(features) -> dict:
     return data
 
 
-async def _run_compute_features_for_config(config_id: int, window_days: int = 30, session_maker=None) -> dict:
+async def _run_compute_features_for_config(config_id: int, window_days: int = 60, session_maker=None) -> dict:
     from projects.ml.db.repositories.insights_repo import InsightsRepository
     from projects.ml.db.repositories.ml_repo import MLRepository
     from projects.ml.services.data_service import DataService
@@ -98,7 +98,7 @@ async def _run_compute_features_for_config(config_id: int, window_days: int = 30
         }
 
 
-async def _run_forecasts_for_config(config_id: int, window_days: int = 90, session_maker=None) -> dict:
+async def _run_forecasts_for_config(config_id: int, window_days: int = 120, session_maker=None) -> dict:
     from projects.ml.db.repositories.insights_repo import InsightsRepository
     from projects.ml.db.repositories.ml_repo import MLRepository
     from projects.ml.services.data_service import DataService
@@ -416,7 +416,7 @@ async def _run_anomaly_detection_for_config(config_id: int, session_maker=None) 
         result = await service.detect_anomalies(
             config_id=config_id,
             days_to_analyze=1,
-            history_days=30,
+            history_days=60,
         )
         return {
             "anomalies_detected": result.anomalies_detected,
@@ -1101,7 +1101,7 @@ async def _run_anomaly_detection_for_entity_type(
             config_id=config_id,
             entity_type=entity_type,
             days_to_analyze=1,
-            history_days=30,
+            history_days=60,
         )
         return {
             "entity_type": entity_type,

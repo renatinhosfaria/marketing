@@ -74,7 +74,7 @@ class RecommendationService:
         logger.info("Verificação de dados desabilitada temporariamente", config_id=config_id)
 
         # Obter métricas agregadas de referência
-        avg_metrics = await self.data_service.get_aggregated_metrics(config_id, days=14)
+        avg_metrics = await self.data_service.get_aggregated_metrics(config_id, days=30)
 
         # Criar rule engine
         rule_engine = create_rule_engine(avg_metrics)

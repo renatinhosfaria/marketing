@@ -77,7 +77,7 @@ class AnomalyService:
         entity_type: str = "campaign",
         entity_ids: Optional[list[str]] = None,
         days_to_analyze: int = 1,
-        history_days: int = 30,
+        history_days: int = 60,
     ) -> AnomalyDetectionResult:
         """
         Executa deteccao de anomalias em entidades.

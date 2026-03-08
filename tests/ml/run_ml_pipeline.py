@@ -86,7 +86,7 @@ async def run_pipeline_for_config(session: AsyncSession, config_id: int, config_
             config_id=config_id,
             entity_type="campaign",
             days_to_analyze=7,
-            history_days=30,
+            history_days=60,
         )
         await session.commit()
 
@@ -110,12 +110,12 @@ async def run_pipeline_for_config(session: AsyncSession, config_id: int, config_
 
         try:
             features_result = await _run_compute_features_for_config(
-                config_id, window_days=30, session_maker=isolated_session_maker
+                config_id, window_days=60, session_maker=isolated_session_maker
             )
             print(f"  Features: processed={features_result['processed']}, inserted={features_result['inserted']}")
 
             forecasts_result = await _run_forecasts_for_config(
-                config_id, window_days=30, session_maker=isolated_session_maker
+                config_id, window_days=120, session_maker=isolated_session_maker
             )
             print(f"  Forecasts: generated={forecasts_result['generated']}, skipped={forecasts_result['skipped']}")
         finally:

@@ -16,35 +16,13 @@ class AgentQueryService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def _get_active_config_id(self) -> int | None:
-        result = await self.db.execute(
-            text(
-                """
-                SELECT id
-                FROM sistema_facebook_ads_config
-                WHERE is_active = TRUE
-                ORDER BY updated_at DESC
-                LIMIT 1
-                """
-            )
-        )
-        row = result.first()
-        return int(row[0]) if row and row[0] is not None else None
-
     async def execute_sql(
         self,
         prompt: str,
         sql: str | None,
         requested_by: str = "fbads",
     ) -> dict[str, Any]:
-        if sql:
-            resolved_sql = sql.strip()
-        else:
-            active_config_id = await self._get_active_config_id()
-            resolved_sql = PromptToSQL.translate(
-                prompt,
-                default_config_id=active_config_id,
-            )
+        resolved_sql = sql.strip() if sql else PromptToSQL.translate(prompt)
         validation = SQLGuard.validate(resolved_sql)
 
         started_at = datetime.utcnow()

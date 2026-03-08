@@ -7,12 +7,12 @@ class PromptToSQL:
     """Traduz prompts conhecidos para SQL seguro e deterministico."""
 
     @staticmethod
-    def translate(prompt: str, default_config_id: int | None = None) -> str:
+    def translate(prompt: str) -> str:
         normalized = prompt.lower().strip()
 
         if "top" in normalized and "campanh" in normalized and "spend" in normalized:
             config_match = re.search(r"config\s*(\d+)", normalized)
-            config_id = int(config_match.group(1)) if config_match else (default_config_id or 1)
+            config_id = int(config_match.group(1)) if config_match else 1
 
             return (
                 "SELECT campaign_id, SUM(spend) AS spend "

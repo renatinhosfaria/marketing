@@ -33,18 +33,156 @@ logger = get_logger(__name__)
 class DataService:
     """
     Serviço para carregar e preparar dados do Facebook Ads.
+    Inclui dados do dia atual (insights_today) para detecção em tempo quase real.
     """
     
     def __init__(self, session: AsyncSession):
         self.session = session
         self.feature_engineer = feature_engineer
+
+    # =========================================================================
+    # Helpers para integração de dados do dia atual (insights_today)
+    # =========================================================================
+
+    async def _fetch_today_data(
+        self,
+        config_id: int,
+        entity_type: Optional[str] = None,
+        entity_id: Optional[str] = None,
+        campaign_ids: Optional[list[str]] = None,
+    ) -> pd.DataFrame:
+        """
+        Busca dados do dia atual da tabela insights_today.
+        Agrega por entidade/data para consolidar múltiplos ads.
+
+        Args:
+            config_id: ID da configuração
+            entity_type: Tipo da entidade para filtro (campaign, adset, ad)
+            entity_id: ID da entidade para filtro
+            campaign_ids: Lista de campaign IDs para filtro (usado em get_all)
+
+        Returns:
+            DataFrame com mesmas colunas do history
+        """
+        T = SistemaFacebookAdsInsightsToday
+
+        # Determinar a coluna de agrupamento
+        group_col = T.campaign_id  # default
+
+        filters = [T.config_id == config_id]
+
+        if entity_type and entity_id:
+            if entity_type == "campaign":
+                filters.append(T.campaign_id == entity_id)
+                group_col = T.campaign_id
+            elif entity_type == "adset":
+                filters.append(T.adset_id == entity_id)
+                group_col = T.adset_id
+            elif entity_type == "ad":
+                filters.append(T.ad_id == entity_id)
+                group_col = T.ad_id
+
+        if campaign_ids:
+            filters.append(T.campaign_id.in_(campaign_ids))
+
+        query = select(
+            func.date(T.date).label('date'),
+            T.campaign_id,
+            T.adset_id,
+            T.ad_id,
+            func.sum(T.spend).label('spend'),
+            func.sum(T.impressions).label('impressions'),
+            func.sum(T.clicks).label('clicks'),
+            func.sum(T.leads).label('leads'),
+            func.avg(T.frequency).label('frequency'),
+            func.sum(T.reach).label('reach'),
+        ).where(
+            and_(*filters)
+        ).group_by(
+            func.date(T.date), T.campaign_id, T.adset_id, T.ad_id
+        )
+
+        result = await self.session.execute(query)
+        rows = result.fetchall()
+
+        if not rows:
+            return pd.DataFrame()
+
+        df = pd.DataFrame(rows, columns=[
+            'date', 'campaign_id', 'adset_id', 'ad_id',
+            'spend', 'impressions', 'clicks', 'leads', 'frequency', 'reach'
+        ])
+
+        df['date'] = pd.to_datetime(df['date'])
+        df['spend'] = df['spend'].astype(float)
+        df['impressions'] = df['impressions'].fillna(0).astype(int)
+        df['clicks'] = df['clicks'].fillna(0).astype(int)
+        df['leads'] = df['leads'].fillna(0).astype(int)
+        df['frequency'] = df['frequency'].fillna(0).astype(float)
+        df['reach'] = df['reach'].fillna(0).astype(int)
+
+        return df
+
+    def _merge_today_with_history(
+        self,
+        history_df: pd.DataFrame,
+        today_df: pd.DataFrame,
+        group_cols: Optional[list[str]] = None,
+    ) -> pd.DataFrame:
+        """
+        Faz merge dos dados de today com history.
+        Dados do history prevalecem para datas que já existem.
+
+        Args:
+            history_df: DataFrame com dados históricos
+            today_df: DataFrame com dados de hoje
+            group_cols: Colunas de agrupamento adicionais (ex: campaign_id)
+
+        Returns:
+            DataFrame combinado
+        """
+        if today_df.empty:
+            return history_df
+        if history_df.empty:
+            return today_df
+
+        # Normalizar datas para comparação (só a parte de data, sem hora)
+        history_dates = set(history_df['date'].dt.date)
+
+        # Filtrar today para manter apenas datas que NÃO existem no history
+        today_df = today_df.copy()
+        today_df['_date_only'] = today_df['date'].dt.date
+        new_data = today_df[~today_df['_date_only'].isin(history_dates)].drop(
+            columns=['_date_only']
+        )
+
+        if new_data.empty:
+            return history_df
+
+        # Garantir mesmas colunas
+        common_cols = [c for c in history_df.columns if c in new_data.columns]
+        new_data = new_data[common_cols]
+
+        # Concatenar e ordenar
+        merged = pd.concat([history_df, new_data], ignore_index=True)
+        merged = merged.sort_values('date').reset_index(drop=True)
+
+        logger.debug(
+            "Dados de hoje integrados ao histórico",
+            history_rows=len(history_df),
+            today_new_rows=len(new_data),
+            total_rows=len(merged),
+        )
+
+        return merged
     
     async def get_campaign_daily_data(
         self,
         config_id: int,
         campaign_id: str,
-        days: int = 30,
-        end_date: Optional[datetime] = None
+        days: int = 60,
+        end_date: Optional[datetime] = None,
+        include_today: bool = True,
     ) -> pd.DataFrame:
         """
         Obtém dados diários de uma campanha específica.
@@ -54,6 +192,7 @@ class DataService:
             campaign_id: ID da campanha no Facebook
             days: Número de dias de histórico
             end_date: Data final (default: hoje)
+            include_today: Se True, inclui dados do dia atual (insights_today)
             
         Returns:
             DataFrame com dados diários
@@ -84,7 +223,7 @@ class DataService:
         result = await self.session.execute(query)
         rows = result.fetchall()
         
-        if not rows:
+        if not rows and not include_today:
             logger.warning(
                 "Sem dados históricos para campanha",
                 config_id=config_id,
@@ -93,18 +232,49 @@ class DataService:
             return pd.DataFrame()
         
         # Converter para DataFrame
-        df = pd.DataFrame(rows, columns=[
-            'date', 'spend', 'impressions', 'clicks', 'leads', 'frequency', 'reach'
-        ])
-        
-        # Converter tipos
-        df['date'] = pd.to_datetime(df['date'])
-        df['spend'] = df['spend'].astype(float)
-        df['impressions'] = df['impressions'].fillna(0).astype(int)
-        df['clicks'] = df['clicks'].fillna(0).astype(int)
-        df['leads'] = df['leads'].fillna(0).astype(int)
-        df['frequency'] = df['frequency'].fillna(0).astype(float)
-        df['reach'] = df['reach'].fillna(0).astype(int)
+        if rows:
+            df = pd.DataFrame(rows, columns=[
+                'date', 'spend', 'impressions', 'clicks', 'leads', 'frequency', 'reach'
+            ])
+            df['date'] = pd.to_datetime(df['date'])
+            df['spend'] = df['spend'].astype(float)
+            df['impressions'] = df['impressions'].fillna(0).astype(int)
+            df['clicks'] = df['clicks'].fillna(0).astype(int)
+            df['leads'] = df['leads'].fillna(0).astype(int)
+            df['frequency'] = df['frequency'].fillna(0).astype(float)
+            df['reach'] = df['reach'].fillna(0).astype(int)
+        else:
+            df = pd.DataFrame()
+
+        # Integrar dados do dia atual
+        if include_today:
+            today_df = await self._fetch_today_data(
+                config_id=config_id,
+                entity_type="campaign",
+                entity_id=campaign_id,
+            )
+            if not today_df.empty:
+                # Selecionar apenas colunas compatíveis
+                today_cols = [c for c in ['date', 'spend', 'impressions', 'clicks',
+                              'leads', 'frequency', 'reach'] if c in today_df.columns]
+                today_subset = today_df[today_cols].copy()
+                # Agregar por data (pode haver múltiplos ads por campanha)
+                today_agg = today_subset.groupby('date').agg({
+                    'spend': 'sum',
+                    'impressions': 'sum',
+                    'clicks': 'sum',
+                    'leads': 'sum',
+                    'frequency': 'mean',
+                    'reach': 'sum',
+                }).reset_index()
+                df = self._merge_today_with_history(df, today_agg)
+
+        if df.empty:
+            logger.warning(
+                "Sem dados para campanha",
+                config_id=config_id,
+                campaign_id=campaign_id
+            )
 
         return df
 
@@ -113,8 +283,9 @@ class DataService:
         config_id: int,
         entity_type: str,
         entity_id: str,
-        days: int = 30,
-        end_date: Optional[datetime] = None
+        days: int = 60,
+        end_date: Optional[datetime] = None,
+        include_today: bool = True,
     ) -> pd.DataFrame:
         """
         Obtem dados diarios de uma entidade especifica.
@@ -125,6 +296,7 @@ class DataService:
             entity_id: ID da entidade no Facebook
             days: Numero de dias de historico
             end_date: Data final (default: hoje)
+            include_today: Se True, inclui dados do dia atual (insights_today)
 
         Returns:
             DataFrame com dados diarios
@@ -168,29 +340,39 @@ class DataService:
         result = await self.session.execute(query)
         rows = result.fetchall()
 
-        if not rows:
-            return pd.DataFrame()
+        if rows:
+            df = pd.DataFrame(rows, columns=[
+                'date', 'campaign_id', 'adset_id', 'ad_id',
+                'spend', 'impressions', 'clicks', 'leads', 'frequency', 'reach'
+            ])
+            df['date'] = pd.to_datetime(df['date'])
+            df['spend'] = df['spend'].astype(float)
+            df['impressions'] = df['impressions'].fillna(0).astype(int)
+            df['clicks'] = df['clicks'].fillna(0).astype(int)
+            df['leads'] = df['leads'].fillna(0).astype(int)
+            df['frequency'] = df['frequency'].fillna(0).astype(float)
+            df['reach'] = df['reach'].fillna(0).astype(int)
+        else:
+            df = pd.DataFrame()
 
-        df = pd.DataFrame(rows, columns=[
-            'date', 'campaign_id', 'adset_id', 'ad_id',
-            'spend', 'impressions', 'clicks', 'leads', 'frequency', 'reach'
-        ])
-
-        df['date'] = pd.to_datetime(df['date'])
-        df['spend'] = df['spend'].astype(float)
-        df['impressions'] = df['impressions'].fillna(0).astype(int)
-        df['clicks'] = df['clicks'].fillna(0).astype(int)
-        df['leads'] = df['leads'].fillna(0).astype(int)
-        df['frequency'] = df['frequency'].fillna(0).astype(float)
-        df['reach'] = df['reach'].fillna(0).astype(int)
+        # Integrar dados do dia atual
+        if include_today:
+            today_df = await self._fetch_today_data(
+                config_id=config_id,
+                entity_type=entity_type,
+                entity_id=entity_id,
+            )
+            if not today_df.empty:
+                df = self._merge_today_with_history(df, today_df)
 
         return df
 
     async def get_all_campaigns_data(
         self,
         config_id: int,
-        days: int = 30,
-        active_only: bool = True
+        days: int = 60,
+        active_only: bool = True,
+        include_today: bool = True,
     ) -> pd.DataFrame:
         """
         Obtém dados de todas as campanhas de uma configuração.
@@ -199,6 +381,7 @@ class DataService:
             config_id: ID da configuração FB Ads
             days: Número de dias de histórico
             active_only: Filtrar apenas campanhas ativas
+            include_today: Se True, inclui dados do dia atual (insights_today)
             
         Returns:
             DataFrame com dados de todas as campanhas
@@ -224,7 +407,7 @@ class DataService:
         
         campaign_ids = [c.campaign_id for c in campaigns]
         
-        # Query nos insights
+        # Query nos insights históricos
         query = select(
             SistemaFacebookAdsInsightsHistory.campaign_id,
             SistemaFacebookAdsInsightsHistory.date,
@@ -245,28 +428,44 @@ class DataService:
         result = await self.session.execute(query)
         rows = result.fetchall()
         
-        if not rows:
-            return pd.DataFrame()
-        
-        df = pd.DataFrame(rows, columns=[
-            'campaign_id', 'date', 'spend', 'impressions', 'clicks', 
-            'leads', 'frequency', 'reach'
-        ])
-        
-        # Converter tipos
-        df['date'] = pd.to_datetime(df['date'])
-        df['spend'] = df['spend'].astype(float)
-        df['impressions'] = df['impressions'].fillna(0).astype(int)
-        df['clicks'] = df['clicks'].fillna(0).astype(int)
-        df['leads'] = df['leads'].fillna(0).astype(int)
-        
+        if rows:
+            df = pd.DataFrame(rows, columns=[
+                'campaign_id', 'date', 'spend', 'impressions', 'clicks', 
+                'leads', 'frequency', 'reach'
+            ])
+            df['date'] = pd.to_datetime(df['date'])
+            df['spend'] = df['spend'].astype(float)
+            df['impressions'] = df['impressions'].fillna(0).astype(int)
+            df['clicks'] = df['clicks'].fillna(0).astype(int)
+            df['leads'] = df['leads'].fillna(0).astype(int)
+        else:
+            df = pd.DataFrame()
+
+        # Integrar dados do dia atual
+        if include_today:
+            today_df = await self._fetch_today_data(
+                config_id=config_id,
+                campaign_ids=campaign_ids,
+            )
+            if not today_df.empty:
+                # Agregar por campaign_id + date
+                today_agg = today_df.groupby(['campaign_id', 'date']).agg({
+                    'spend': 'sum',
+                    'impressions': 'sum',
+                    'clicks': 'sum',
+                    'leads': 'sum',
+                    'frequency': 'mean',
+                    'reach': 'sum',
+                }).reset_index()
+                df = self._merge_today_with_history(df, today_agg)
+
         return df
     
     async def get_campaign_features(
         self,
         config_id: int,
         campaign_id: str,
-        days: int = 30
+        days: int = 60
     ) -> Optional[CampaignFeatures]:
         """
         Obtém features calculadas para uma campanha.
@@ -355,7 +554,7 @@ class DataService:
         entity_type: str,
         entity_id: str,
         parent_id: Optional[str] = None,
-        days: int = 30
+        days: int = 60
     ) -> Optional[EntityFeatures]:
         """
         Obtem features calculadas para uma entidade.
@@ -719,55 +918,109 @@ class DataService:
         entity_type: str,
         entity_id: str,
         parent_id: Optional[str],
-        days: int = 7
+        days: int = 14
     ) -> Optional[pd.DataFrame]:
-        """Obtem metricas dos irmaos para comparacao."""
+        """Obtem metricas dos irmaos para comparacao (inclui dados de hoje)."""
         if not parent_id:
             return None
 
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
 
+        T = SistemaFacebookAdsInsightsToday
+        H = SistemaFacebookAdsInsightsHistory
+
         if entity_type == "adset":
-            # Get all adsets in the same campaign
+            # History: all adsets in the same campaign
             query = select(
-                SistemaFacebookAdsInsightsHistory.adset_id,
-                func.sum(SistemaFacebookAdsInsightsHistory.spend).label('spend'),
-                func.sum(SistemaFacebookAdsInsightsHistory.leads).label('leads'),
+                H.adset_id.label('entity_id'),
+                func.sum(H.spend).label('spend'),
+                func.sum(H.leads).label('leads'),
             ).where(
                 and_(
-                    SistemaFacebookAdsInsightsHistory.config_id == config_id,
-                    SistemaFacebookAdsInsightsHistory.campaign_id == parent_id,
-                    SistemaFacebookAdsInsightsHistory.adset_id != entity_id,
-                    SistemaFacebookAdsInsightsHistory.date >= start_date,
+                    H.config_id == config_id,
+                    H.campaign_id == parent_id,
+                    H.adset_id != entity_id,
+                    H.date >= start_date,
                 )
-            ).group_by(SistemaFacebookAdsInsightsHistory.adset_id)
+            ).group_by(H.adset_id)
+
+            # Today: same filter
+            today_query = select(
+                T.adset_id.label('entity_id'),
+                func.sum(T.spend).label('spend'),
+                func.sum(T.leads).label('leads'),
+            ).where(
+                and_(
+                    T.config_id == config_id,
+                    T.campaign_id == parent_id,
+                    T.adset_id != entity_id,
+                )
+            ).group_by(T.adset_id)
+
         elif entity_type == "ad":
-            # Get all ads in the same adset
+            # History: all ads in the same adset
             query = select(
-                SistemaFacebookAdsInsightsHistory.ad_id,
-                func.sum(SistemaFacebookAdsInsightsHistory.spend).label('spend'),
-                func.sum(SistemaFacebookAdsInsightsHistory.leads).label('leads'),
+                H.ad_id.label('entity_id'),
+                func.sum(H.spend).label('spend'),
+                func.sum(H.leads).label('leads'),
             ).where(
                 and_(
-                    SistemaFacebookAdsInsightsHistory.config_id == config_id,
-                    SistemaFacebookAdsInsightsHistory.adset_id == parent_id,
-                    SistemaFacebookAdsInsightsHistory.ad_id != entity_id,
-                    SistemaFacebookAdsInsightsHistory.date >= start_date,
+                    H.config_id == config_id,
+                    H.adset_id == parent_id,
+                    H.ad_id != entity_id,
+                    H.date >= start_date,
                 )
-            ).group_by(SistemaFacebookAdsInsightsHistory.ad_id)
+            ).group_by(H.ad_id)
+
+            # Today: same filter
+            today_query = select(
+                T.ad_id.label('entity_id'),
+                func.sum(T.spend).label('spend'),
+                func.sum(T.leads).label('leads'),
+            ).where(
+                and_(
+                    T.config_id == config_id,
+                    T.adset_id == parent_id,
+                    T.ad_id != entity_id,
+                )
+            ).group_by(T.ad_id)
         else:
             return None
 
+        # Fetch history
         result = await self.session.execute(query)
         rows = result.fetchall()
 
-        if not rows:
+        # Fetch today
+        today_result = await self.session.execute(today_query)
+        today_rows = today_result.fetchall()
+
+        if not rows and not today_rows:
             return None
 
-        df = pd.DataFrame(rows, columns=['entity_id', 'spend', 'leads'])
-        df['spend'] = df['spend'].astype(float)
-        df['leads'] = df['leads'].astype(int)
+        # Build history df
+        dfs = []
+        if rows:
+            df_hist = pd.DataFrame(rows, columns=['entity_id', 'spend', 'leads'])
+            df_hist['spend'] = df_hist['spend'].astype(float)
+            df_hist['leads'] = df_hist['leads'].astype(int)
+            dfs.append(df_hist)
+
+        # Build today df
+        if today_rows:
+            df_today = pd.DataFrame(today_rows, columns=['entity_id', 'spend', 'leads'])
+            df_today['spend'] = df_today['spend'].astype(float)
+            df_today['leads'] = df_today['leads'].astype(int)
+            dfs.append(df_today)
+
+        # Merge: sum spend and leads by entity
+        df = pd.concat(dfs, ignore_index=True)
+        df = df.groupby('entity_id').agg({
+            'spend': 'sum',
+            'leads': 'sum',
+        }).reset_index()
+
         df['cpl'] = df.apply(
             lambda r: r['spend'] / r['leads'] if r['leads'] > 0 else 0, axis=1
         )
