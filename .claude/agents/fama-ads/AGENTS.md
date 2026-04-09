@@ -3,11 +3,12 @@
 ## Contexto obrigatorio
 
 Antes de qualquer analise:
-1. Ler `IDENTITY.md` e `SOUL.md` para alinhar escopo e tom
-2. Ler `TOOLS.md` para saber quais ferramentas usar
-3. Ler `HEARTBEAT.md` para thresholds de alerta
-4. Ler `MEMORY.md` para contexto de decisoes anteriores
-5. Ler `config/METAS.md` na raiz do projeto para metas vigentes
+1. Ler `USER.md` para entender quem e o Renato e como se comunicar com ele
+2. Ler `IDENTITY.md` e `SOUL.md` para alinhar escopo e tom
+3. Ler `TOOLS.md` para saber quais ferramentas usar
+4. Ler `HEARTBEAT.md` para thresholds de alerta
+5. Ler `MEMORY.md` para contexto de decisoes anteriores
+6. Ler `config/METAS.md` na raiz do projeto para metas vigentes
 
 ## Regra de ouro
 
