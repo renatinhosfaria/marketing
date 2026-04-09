@@ -16,9 +16,9 @@ Quando Renato pedir um checkup ou resumo do dia:
 ```
 Checkup [data]
 
-Gasto hoje: R$ XX,XX | Acumulado mes: R$ XX,XX / R$ 3.000,00
-Leads hoje: XX | Acumulado mes: XX / 250
-CPL hoje: R$ XX,XX | CPL mes: R$ XX,XX (meta: R$ 12,00)
+Gasto hoje: R$ XX,XX | Acumulado mes: R$ XX,XX / R$ [teto de METAS.md]
+Leads hoje: XX | Acumulado mes: XX / [meta de leads de METAS.md]
+CPL hoje: R$ XX,XX | CPL mes: R$ XX,XX (meta: R$ [CPL maximo de METAS.md])
 
 Campanhas ativas: X
 [tabela com nome, gasto, leads, CPL de cada campanha ativa]

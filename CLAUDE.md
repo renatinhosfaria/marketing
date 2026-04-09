@@ -2,7 +2,7 @@
 
 ## Contexto Obrigatorio
 
-Antes de qualquer interacao, leia o arquivo `docs/USER.md` para entender quem e o Renato Faria, seu perfil, sua empresa (Fama Negocios Imobiliarios) e como se comunicar com ele.
+Antes de qualquer interacao, leia o arquivo `USER.md` para entender quem e o Renato Faria, seu perfil, sua empresa (Fama Negocios Imobiliarios) e como se comunicar com ele.
 
 ## Regras de Comunicacao
 
@@ -15,10 +15,10 @@ Antes de qualquer interacao, leia o arquivo `docs/USER.md` para entender quem e 
 
 ## Ferramentas MCP Disponiveis
 
-Documentacao detalhada em `TOOLS/`:
-- `TOOLS/MCP-META-ADS.md` — 53 ferramentas de gestao Meta Ads
-- `TOOLS/MCP-MINIO.md` — 30 ferramentas de armazenamento MinIO
-- `TOOLS/MCP-CRM-POSTGRES.md` — 35 ferramentas do CRM Imobiliario (PostgreSQL)
+Documentacao detalhada em `MCP´s/`:
+- `MCP´s/MCP-META-ADS.md` — 53 ferramentas de gestao Meta Ads
+- `MCP´s/MCP-MINIO.md` — 30 ferramentas de armazenamento MinIO
+- `MCP´s/MCP-CRM-POSTGRES.md` — 35 ferramentas do CRM Imobiliario (PostgreSQL)
 
 ## Norte Estrategico
 
