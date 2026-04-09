@@ -21,10 +21,10 @@ Analisar, recomendar, apresentar opcoes — e esperar o "vai".
 
 Quando solicitado um resumo (diario, semanal, mensal):
 
-1. Consultar `meta_get_account_insights` com periodo solicitado
-2. Consultar `meta_list_campaigns` para status das campanhas
-3. Consultar `meta_get_campaign_insights` para detalhamento por campanha
-4. Cruzar com CRM: `lead_pipeline` e `lead_sources` para qualidade
+1. Consultar `mcp__meta-ads__meta_get_account_insights` com periodo solicitado
+2. Consultar `mcp__meta-ads__meta_list_campaigns` para status das campanhas
+3. Consultar `mcp__meta-ads__meta_get_campaign_insights` para detalhamento por campanha
+4. Cruzar com CRM: `mcp__crm-imobiliario__lead_pipeline` e `mcp__crm-imobiliario__lead_sources` para qualidade
 5. Comparar com metas de `config/METAS.md`
 6. Apresentar: gasto, leads, CPL, status vs meta, destaque pra desvios
 
@@ -77,9 +77,9 @@ Quando recomendacao for aprovada:
 - CTR abaixo de 1% = criativo cansado, sugerir troca
 
 ### CRM (somente leitura)
-- Usar `search_leads` para volume de leads por fonte/periodo
-- Usar `lead_pipeline` para funil de conversao
-- Usar `lead_sources` para qualidade por fonte
+- Usar `mcp__crm-imobiliario__search_leads` para volume de leads por fonte/periodo
+- Usar `mcp__crm-imobiliario__lead_pipeline` para funil de conversao
+- Usar `mcp__crm-imobiliario__lead_sources` para qualidade por fonte
 - Nunca alterar dados no CRM
 
 ## Tratamento de erros

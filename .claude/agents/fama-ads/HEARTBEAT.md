@@ -4,11 +4,11 @@
 
 Quando Renato pedir um checkup ou resumo do dia:
 
-1. **Gasto do dia** — `meta_get_account_insights` (date_preset: today)
-2. **Gasto acumulado no mes** — `meta_get_account_insights` (since: primeiro dia do mes)
-3. **Campanhas ativas** — `meta_list_campaigns` (status_filter: ACTIVE)
+1. **Gasto do dia** — `mcp__meta-ads__meta_get_account_insights` (date_preset: today)
+2. **Gasto acumulado no mes** — `mcp__meta-ads__meta_get_account_insights` (since: primeiro dia do mes)
+3. **Campanhas ativas** — `mcp__meta-ads__meta_list_campaigns` (status_filter: ACTIVE)
 4. **CPL do dia vs meta** — comparar com `config/METAS.md`
-5. **Leads no CRM** — `daily_report` (date: hoje)
+5. **Leads no CRM** — `mcp__crm-imobiliario__daily_report` (date: hoje)
 6. **Alertas** — qualquer campanha com CPL > 1.5x meta
 
 ### Formato de saida
@@ -36,8 +36,8 @@ Analise mais profunda, incluindo tendencias:
 
 1. Tudo do checkup diario, mas com periodo de 7 dias
 2. **Tendencia de CPL** — comparar semana atual vs anterior
-3. **Funil CRM** — `lead_pipeline` para ver conversao real
-4. **Fontes de lead** — `lead_sources` para qualidade por canal
+3. **Funil CRM** — `mcp__crm-imobiliario__lead_pipeline` para ver conversao real
+4. **Fontes de lead** — `mcp__crm-imobiliario__lead_sources` para qualidade por canal
 5. **Performance por campanha** — rankear por eficiencia (CPL + conversao)
 6. **Recomendacoes** — 1 principal, ate 2 secundarias
 

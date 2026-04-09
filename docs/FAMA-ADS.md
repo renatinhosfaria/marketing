@@ -104,10 +104,10 @@ Visao consolidada para um periodo (diario, semanal, mensal).
 
 | Passo | Acao | Ferramenta |
 |-------|------|------------|
-| 1 | Consultar metricas gerais da conta | `meta_get_account_insights` |
-| 2 | Listar campanhas e status | `meta_list_campaigns` |
-| 3 | Detalhar performance por campanha | `meta_get_campaign_insights` |
-| 4 | Cruzar com funil do CRM | `lead_pipeline` + `lead_sources` |
+| 1 | Consultar metricas gerais da conta | `mcp__meta-ads__meta_get_account_insights` |
+| 2 | Listar campanhas e status | `mcp__meta-ads__meta_list_campaigns` |
+| 3 | Detalhar performance por campanha | `mcp__meta-ads__meta_get_campaign_insights` |
+| 4 | Cruzar com funil do CRM | `mcp__crm-imobiliario__lead_pipeline` + `mcp__crm-imobiliario__lead_sources` |
 | 5 | Comparar com metas vigentes | `config/METAS.md` |
 | 6 | Apresentar desvios e status vs meta | — |
 
